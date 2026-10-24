@@ -1,0 +1,37 @@
+/**
+ * Global Physics, Viewport & Balance Constants
+ */
+
+export const SAVE_KEY = 'boulder_barrage_save_v1';
+export const SAVE_SCHEMA_VERSION = 2;
+
+export const PHYSICS = {
+  GRAVITY: 490,
+  COIN_GRAVITY: 580,
+  POWERUP_GRAVITY: 320,
+  PARTICLE_GRAVITY: 260,
+  GROUND_HEIGHT: 96,
+  KEY_MOVE_SPEED: 420,
+  CANNON_TRACK_SMOOTHING: 22,
+  CANNON_RADIUS: 26,
+  BULLET_SPEED_NORMAL: -760,
+  BULLET_SPEED_OVERDRIVE: -880,
+  DEFAULT_MAGNET_RANGE: 115,
+  BOOSTED_MAGNET_RANGE: 900,
+  DEFAULT_MAGNET_SPEED: 620,
+  BOOSTED_MAGNET_SPEED: 850,
+  REVIVE_SHIELD_DURATION: 3.5,
+  CRYO_TIME_SCALE: 0.45,
+};
+
+export const ROCK_RADII = {
+  1: 24,
+  2: 38,
+  3: 54,
+};
+
+export const ROCK_BOUNCE_VELOCITIES = {
+  1: -445,
+  2: -495,
+  3: -540,
+};

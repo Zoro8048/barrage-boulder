@@ -1,0 +1,86 @@
+/**
+ * Lifetime Achievements Registry
+ */
+
+export const ACHIEVEMENTS = [
+  {
+    id: 'rocks_25',
+    icon: '🪨',
+    name: 'Pebble Breaker',
+    desc: 'Destroy 25 boulders',
+    reward: 50,
+    progress: (s) => [s.stats.rocksDestroyed, 25],
+  },
+  {
+    id: 'rocks_250',
+    icon: '💥',
+    name: 'Boulder Crusher',
+    desc: 'Destroy 250 boulders',
+    reward: 200,
+    progress: (s) => [s.stats.rocksDestroyed, 250],
+  },
+  {
+    id: 'rocks_1000',
+    icon: '☄️',
+    name: 'Meteor Obliterator',
+    desc: 'Destroy 1,000 boulders',
+    reward: 750,
+    progress: (s) => [s.stats.rocksDestroyed, 1000],
+  },
+  {
+    id: 'wave_5',
+    icon: '🌊',
+    name: 'Wave Rider',
+    desc: 'Reach Wave 5',
+    reward: 100,
+    progress: (s) => [s.stats.highestWave, 5],
+  },
+  {
+    id: 'wave_10',
+    icon: '🚩',
+    name: 'Milestone Conqueror',
+    desc: 'Reach Milestone Wave 10',
+    reward: 350,
+    progress: (s) => [s.stats.highestWave, 10],
+  },
+  {
+    id: 'wave_20',
+    icon: '👑',
+    name: 'Barrage Legend',
+    desc: 'Reach Milestone Wave 20',
+    reward: 1000,
+    progress: (s) => [s.stats.highestWave, 20],
+  },
+  {
+    id: 'boss_5',
+    icon: '⚔️',
+    name: 'Boss Slayer',
+    desc: 'Defeat 5 Boss boulders',
+    reward: 300,
+    progress: (s) => [s.stats.bossesDefeated, 5],
+  },
+  {
+    id: 'powerups_15',
+    icon: '⚡',
+    name: 'Power Surge',
+    desc: 'Collect 15 Power-up drops',
+    reward: 180,
+    progress: (s) => [s.stats.powerupsCollected, 15],
+  },
+  {
+    id: 'coins_5000',
+    icon: '💰',
+    name: 'Gold Hoarder',
+    desc: 'Earn 5,000 lifetime coins',
+    reward: 400,
+    progress: (s) => [s.stats.totalCoinsEarned, 5000],
+  },
+  {
+    id: 'score_10k',
+    icon: '🎯',
+    name: 'Sharpshooter',
+    desc: 'Score 10,000 in a single run',
+    reward: 300,
+    progress: (s) => [s.bestScore, 10000],
+  },
+];

@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#141b33" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Boulder Barrage" />
+  <title>Boulder Barrage</title>
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <div id="app-shell">
+    <div id="game-container">
+      <canvas id="game-canvas"></canvas>
+
+      <!-- Top HUD -->
+      <header id="hud">
+        <div class="hud-top-row">
+          <div class="currency-pill" id="coin-pill">
+            <span class="coin-icon">🪙</span>
+            <span id="coin-count">0</span>
+          </div>
+
+          <div class="wave-progress-wrap">
+            <div class="wave-badge" id="wave-current">1</div>
+            <div class="wave-bar-track">
+              <div class="wave-bar-fill" id="wave-bar-fill"></div>
+            </div>
+            <div class="wave-badge next" id="wave-next">2</div>
+          </div>
+
+          <div class="hud-actions">
+            <button id="skins-btn" class="icon-btn" title="Skins &amp; Themes" aria-label="Skins and Themes">
+              🎨
+            </button>
+            <button id="stats-btn" class="icon-btn" title="Stats &amp; Achievements" aria-label="Stats and Achievements">
+              🏆
+            </button>
+            <button id="settings-btn" class="icon-btn" title="Audio &amp; Settings" aria-label="Audio and Settings">
+              ⚙️
+            </button>
+          </div>
+        </div>
+
+        <!-- Milestone / Boss HP Bar -->
+        <div id="boss-hud" class="boss-hud hidden">
+          <div class="boss-hud-label" id="boss-hud-label">👑 BOSS BOULDER</div>
+          <div class="boss-bar-track">
+            <div class="boss-bar-fill" id="boss-bar-fill"></div>
+          </div>
+        </div>
+
+        <!-- Active Power-up Pills -->
+        <div id="powerup-hud" class="powerup-hud"></div>
+
+        <div class="score-display">
+          <div id="current-score">0</div>
+          <div id="best-score">BEST: 0</div>
+        </div>
+      </header>
+
+      <!-- Achievement Toast Notification -->
+      <div id="achievement-toast" class="achievement-toast hidden">
+        <span class="ach-toast-icon" id="ach-toast-icon">🏆</span>
+        <div class="ach-toast-body">
+          <div class="ach-toast-label">ACHIEVEMENT UNLOCKED!</div>
+          <div class="ach-toast-title" id="ach-toast-title">Boulder Crusher</div>
+        </div>
+      </div>
+
+      <!-- Drag to Start Prompt (shown in lobby before dragging) -->
+      <div id="start-prompt" class="visible">
+        <div class="hand-slider">
+          <span class="arrow">◀</span>
+          <span class="hand-icon">👆</span>
+          <span class="arrow">▶</span>
+        </div>
+        <p>DRAG OR USE ◀ ▶ &amp; SPACE</p>
+      </div>
+
+      <!-- Wave Clear / Boss Warning Banner -->
+      <div id="wave-banner" class="hidden">
+        <div class="wave-banner-title" id="wave-banner-text">WAVE 1 CLEARED!</div>
+        <div class="wave-banner-sub" id="wave-banner-bonus">+50 🪙 BONUS</div>
+      </div>
+
+      <!-- Bottom Upgrade Panel (visible between runs / before dragging) -->
+      <section id="upgrade-panel" class="visible">
+        <div class="upgrade-grid">
+          <button class="upgrade-card" data-upgrade="fireRate" id="upg-fireRate">
+            <div class="upg-header">
+              <span class="upg-icon">⚡</span>
+              <span class="upg-title">FIRE RATE</span>
+            </div>
+            <div class="upg-stat" id="stat-fireRate">100%</div>
+            <div class="upg-level" id="lvl-fireRate">Lv. 1</div>
+            <div class="upg-cost">
+              <span>🪙</span>
+              <span id="cost-fireRate">10</span>
+            </div>
+          </button>
+
+          <button class="upgrade-card" data-upgrade="firePower" id="upg-firePower">
+            <div class="upg-header">
+              <span class="upg-icon">💥</span>
+              <span class="upg-title">FIRE POWER</span>
+            </div>
+            <div class="upg-stat" id="stat-firePower">100%</div>
+            <div class="upg-level" id="lvl-firePower">Lv. 1</div>
+            <div class="upg-cost">
+              <span>🪙</span>
+              <span id="cost-firePower">10</span>
+            </div>
+          </button>
+
+          <button class="upgrade-card" data-upgrade="coinValue" id="upg-coinValue">
+            <div class="upg-header">
+              <span class="upg-icon">💰</span>
+              <span class="upg-title">COINS</span>
+            </div>
+            <div class="upg-stat" id="stat-coinValue">100%</div>
+            <div class="upg-level" id="lvl-coinValue">Lv. 1</div>
+            <div class="upg-cost">
+              <span>🪙</span>
+              <span id="cost-coinValue">15</span>
+            </div>
+          </button>
+
+          <button class="upgrade-card" data-upgrade="offlineEarnings" id="upg-offlineEarnings">
+            <div class="upg-header">
+              <span class="upg-icon">⏳</span>
+              <span class="upg-title">OFFLINE</span>
+            </div>
+            <div class="upg-stat" id="stat-offlineEarnings">100%</div>
+            <div class="upg-level" id="lvl-offlineEarnings">Lv. 1</div>
+            <div class="upg-cost">
+              <span>🪙</span>
+              <span id="cost-offlineEarnings">15</span>
+            </div>
+          </button>
+        </div>
+
+        <div class="panel-footer">
+          <button id="open-skins-footer-btn" class="pill-footer-btn">🎨 Hangar &amp; Themes</button>
+          <button id="open-stats-footer-btn" class="pill-footer-btn">🏆 Achievements</button>
+          <button id="reset-save-btn" class="text-btn">Reset Progress</button>
+        </div>
+
+        <div class="legal-footer-bar">
+          <span>100% Free Non-Commercial Hobby Project • Zero Monetization</span>
+          <button type="button" id="open-disclaimer-btn" class="disclaimer-link-btn">
+            ℹ️ Legal Notice
+          </button>
+        </div>
+      </section>
+
+      <!-- Game Over Modal -->
+      <div id="gameover-modal" class="modal-backdrop hidden">
+        <div class="modal-card">
+          <div class="modal-badge">CRUSHED!</div>
+          <h2 id="go-title">WAVE 1 FAILED</h2>
+          <div class="go-stats">
+            <div class="go-stat-box">
+              <span class="go-label">SCORE</span>
+              <span class="go-value" id="go-score">0</span>
+            </div>
+            <div class="go-stat-box">
+              <span class="go-label">COINS EARNED</span>
+              <span class="go-value gold" id="go-coins">+0 🪙</span>
+            </div>
+          </div>
+          <div class="modal-actions">
+            <button id="revive-btn" class="action-btn secondary">
+              🛡️ SECOND WIND (FREE)
+            </button>
+            <button id="continue-btn" class="action-btn primary">
+              UPGRADE &amp; RETRY
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Offline Earnings Modal -->
+      <div id="offline-modal" class="modal-backdrop hidden">
+        <div class="modal-card">
+          <div class="modal-badge gold-badge">WELCOME BACK!</div>
+          <h2>OFFLINE EARNINGS</h2>
+          <p class="offline-desc">Your cannon kept grinding while you were away:</p>
+          <div class="offline-reward" id="offline-amount">+0 🪙</div>
+          <button id="claim-offline-btn" class="action-btn primary">
+            COLLECT COINS
+          </button>
+        </div>
+      </div>
+
+      <!-- Skins & Visual Themes Modal -->
+      <div id="skins-modal" class="modal-backdrop hidden">
+        <div class="modal-card wide-modal">
+          <button class="modal-close-btn" data-close="skins-modal" aria-label="Close">✕</button>
+          <div class="modal-badge blue-badge">CUSTOMIZE</div>
+          <h2>HANGAR &amp; THEMES</h2>
+
+          <div class="section-subtitle">CANNON SKINS</div>
+          <div id="cannon-skins-list" class="unlock-grid"></div>
+
+          <div class="section-subtitle">ARENA THEMES</div>
+          <div id="arena-themes-list" class="unlock-grid"></div>
+        </div>
+      </div>
+
+      <!-- High-Score Stats & Lifetime Achievements Modal -->
+      <div id="stats-modal" class="modal-backdrop hidden">
+        <div class="modal-card wide-modal">
+          <button class="modal-close-btn" data-close="stats-modal" aria-label="Close">✕</button>
+          <div class="modal-badge gold-badge">HALL OF FAME</div>
+          <h2>STATS &amp; ACHIEVEMENTS</h2>
+
+          <div class="stats-summary-grid" id="lifetime-stats-grid"></div>
+
+          <div class="section-subtitle">LIFETIME ACHIEVEMENTS</div>
+          <div id="achievements-list" class="achievements-list"></div>
+        </div>
+      </div>
+
+      <!-- Audio & Haptics Settings Modal -->
+      <div id="settings-modal" class="modal-backdrop hidden">
+        <div class="modal-card">
+          <button class="modal-close-btn" data-close="settings-modal" aria-label="Close">✕</button>
+          <div class="modal-badge blue-badge">PREFERENCES</div>
+          <h2>SETTINGS</h2>
+
+          <div class="settings-group">
+            <div class="setting-row">
+              <div class="setting-label">
+                <span>🔊 SFX Volume</span>
+                <span id="sfx-vol-val">80%</span>
+              </div>
+              <input type="range" id="sfx-volume-slider" min="0" max="100" value="80" class="slider-input" />
+            </div>
+
+            <div class="setting-row">
+              <div class="setting-label">
+                <span>🎵 Synth Music Volume</span>
+                <span id="music-vol-val">50%</span>
+              </div>
+              <input type="range" id="music-volume-slider" min="0" max="100" value="50" class="slider-input" />
+            </div>
+
+            <div class="setting-row toggle-row">
+              <div class="setting-label-col">
+                <span>📳 Haptic Vibration</span>
+                <small>Mobile vibration on hits, splits &amp; bosses</small>
+              </div>
+              <button id="haptics-toggle-btn" class="toggle-pill active">ON</button>
+            </div>
+          </div>
+
+          <div class="rock-legend">
+            <div class="section-subtitle">BOULDER &amp; POWER-UP GUIDE</div>
+            <div class="legend-grid">
+              <div class="legend-item"><span>🛡️ Armored</span><small>40% dmg resist above 50% HP</small></div>
+              <div class="legend-item"><span>☄️ Meteor</span><small>Fast horizontal, low bounce</small></div>
+              <div class="legend-item"><span>💚 Healer</span><small>Pulses HP to nearby rocks</small></div>
+              <div class="legend-item"><span>👑 Milestone</span><small>Mega-Boss every 10 waves</small></div>
+            </div>
+          </div>
+
+          <div class="modal-actions">
+            <button type="button" id="open-disclaimer-settings-btn" class="action-btn secondary">
+              ℹ️ LEGAL &amp; NON-COMMERCIAL NOTICE
+            </button>
+            <button type="button" class="action-btn primary" data-close="settings-modal">DONE</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Legal & Non-Commercial Disclaimer Modal -->
+      <div id="disclaimer-modal" class="modal-backdrop hidden">
+        <div class="modal-card wide-modal">
+          <button class="modal-close-btn" data-close="disclaimer-modal" aria-label="Close">✕</button>
+          <div class="modal-badge blue-badge">LEGAL &amp; NON-COMMERCIAL NOTICE</div>
+          <h2>DISCLAIMER</h2>
+
+          <div class="disclaimer-content">
+            <div class="disclaimer-block">
+              <strong>1. Strictly Non-Commercial &amp; Unpaid Educational Hobby Project</strong>
+              <p>
+                This software is developed and hosted solely as a personal, unpaid coding and educational exercise. It generates <strong>zero revenue</strong> and contains no advertisements, no in-app purchases, no paywalls, no sponsorships, no subscriptions, and no donation or tip links of any kind. Operating or sharing this personal educational and portfolio project does not constitute commercial business activity or employment.
+              </p>
+            </div>
+
+            <div class="disclaimer-block">
+              <strong>2. Original Code, Procedural Assets &amp; No Trademark Affiliation</strong>
+              <p>
+                100% of the source code, vector geometry (HTML5 Canvas 2D primitives), and synthesized audio (Web Audio API oscillators) are original and generated procedurally at runtime. No third-party sprites, audio recordings, fonts, or proprietary assets are used. <strong>Boulder Barrage</strong> is an independent work and is not affiliated with, endorsed by, or connected to any commercial game studio or publisher.
+              </p>
+            </div>
+
+            <div class="disclaimer-block">
+              <strong>3. Local-Only Data &amp; Privacy</strong>
+              <p>
+                All game state is stored strictly locally in your browser via <code>localStorage</code>. No personal data, analytics, cookies, or telemetry are collected or transmitted to any external server.
+              </p>
+            </div>
+          </div>
+
+          <button class="action-btn primary" data-close="disclaimer-modal">UNDERSTOOD</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="./game.js"></script>
+</body>
+</html>
