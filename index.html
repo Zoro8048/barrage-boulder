@@ -62,8 +62,15 @@
         <div class="score-display">
           <div id="current-score">0</div>
           <div id="best-score">BEST: 0</div>
+          <div id="combo-pill" class="combo-pill hidden">🔥 5x COMBO (1.2x)</div>
         </div>
       </header>
+
+      <!-- Active Ultimate Ability Button (shown during gameplay) -->
+      <button type="button" id="ult-btn" class="ult-btn hidden" title="Orbital Supernova (E / Shift)">
+        <span class="ult-icon">☄️</span>
+        <span class="ult-pct" id="ult-pct">0%</span>
+      </button>
 
       <!-- Achievement Toast Notification -->
       <div id="achievement-toast" class="achievement-toast hidden">
@@ -147,9 +154,10 @@
         </div>
 
         <div class="panel-footer">
-          <button id="open-skins-footer-btn" class="pill-footer-btn">🎨 Hangar &amp; Themes</button>
-          <button id="open-stats-footer-btn" class="pill-footer-btn">🏆 Achievements</button>
-          <button id="reset-save-btn" class="text-btn">Reset Progress</button>
+          <button type="button" id="mode-toggle-btn" class="pill-footer-btn">🌊 Mode: Standard</button>
+          <button type="button" id="open-skins-footer-btn" class="pill-footer-btn">🎨 Hangar &amp; Themes</button>
+          <button type="button" id="open-stats-footer-btn" class="pill-footer-btn">🏆 Achievements</button>
+          <button type="button" id="reset-save-btn" class="text-btn">Reset Progress</button>
         </div>
 
         <div class="legal-footer-bar">

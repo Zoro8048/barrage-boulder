@@ -28,6 +28,20 @@ export function getBarrelCount(fireRateLevel = 1) {
   return 1;
 }
 
+export function getDroneCount(highestWave = 1, firePowerLevel = 1) {
+  if (highestWave >= 12 || firePowerLevel >= 10) return 2;
+  if (highestWave >= 5 || firePowerLevel >= 5) return 1;
+  return 0;
+}
+
+export function getComboMultiplier(comboCount = 0) {
+  if (comboCount >= 50) return 2.5;
+  if (comboCount >= 25) return 2.0;
+  if (comboCount >= 10) return 1.5;
+  if (comboCount >= 5) return 1.2;
+  return 1.0;
+}
+
 export function getBulletDamage(firePowerLevel = 1) {
   const lvl = Math.max(1, firePowerLevel);
   return Math.round(lvl + Math.pow(lvl - 1, 1.35) * 0.6);
@@ -37,9 +51,10 @@ export function getBaseCoinMultiplier(coinValueLevel = 1) {
   return 1 + (Math.max(1, coinValueLevel) - 1) * UPGRADE_CONFIG.coinValue.multiplierPerLevel;
 }
 
-export function getCoinMultiplier(coinValueLevel = 1, isMagnetActive = false) {
+export function getCoinMultiplier(coinValueLevel = 1, isMagnetActive = false, isBossRush = false) {
   const base = getBaseCoinMultiplier(coinValueLevel);
-  return isMagnetActive ? base * UPGRADE_CONFIG.coinValue.magnetBonusMultiplier : base;
+  const magnetMult = isMagnetActive ? base * UPGRADE_CONFIG.coinValue.magnetBonusMultiplier : base;
+  return isBossRush ? magnetMult * 2.0 : magnetMult;
 }
 
 export function getOfflineCoinsPerMinute(offlineLevel = 1) {

@@ -1,11 +1,12 @@
 /**
- * CombatSystem - Handles volley firing, bullet-to-rock collisions, armor cracking,
- * rock splitting, boss abilities, and healer pulses.
+ * CombatSystem - Handles volley firing, Wingman Drone targeting, Critical Hits,
+ * Combo multipliers, Ultimate Supernova Beam, armor cracking, rock splitting, and boss skills.
  */
 
-import { PHYSICS } from '../config/constants.js';
+import { PHYSICS, COMBAT } from '../config/constants.js';
 import { ROCK_VARIANTS, getRockColorTier } from '../config/rockVariants.js';
 import { createRock } from '../entities/Rock.js';
+import { getComboMultiplier } from '../state/UpgradeMath.js';
 import { formatNum } from '../core/utils.js';
 
 export class CombatSystem {
@@ -30,6 +31,8 @@ export class CombatSystem {
           vy: isOverdrive ? PHYSICS.BULLET_SPEED_OVERDRIVE : PHYSICS.BULLET_SPEED_NORMAL,
           radius: isOverdrive ? 6.2 : 5.5,
           overdrive: isOverdrive,
+          isDrone: false,
+          damageRatio: 1.0,
         })
       );
     }
@@ -39,17 +42,101 @@ export class CombatSystem {
     this.bus.emit('sfx:shoot', { overdrive: isOverdrive });
   }
 
+  fireDrones(engine) {
+    const { cannon, rocks, bullets, bulletPool } = engine;
+    const droneCount = engine.getDroneCount();
+    if (droneCount <= 0 || rocks.length === 0) return;
+
+    // Target the boulder closest to the ground
+    let target = rocks[0];
+    for (const r of rocks) {
+      if (r.y + r.radius > target.y + target.radius) {
+        target = r;
+      }
+    }
+
+    const offsets = droneCount >= 2 ? [-44, 44] : [-44];
+    const bobY = Math.sin(cannon.droneBobPhase) * 4;
+
+    for (const ox of offsets) {
+      const sx = cannon.x + ox;
+      const sy = cannon.y - 34 + bobY;
+      const dx = target.x - sx;
+      const dy = target.y - sy;
+      const dist = Math.hypot(dx, dy) || 1;
+
+      bullets.push(
+        bulletPool.acquire({
+          x: sx,
+          y: sy,
+          vx: (dx / dist) * COMBAT.DRONE_BULLET_SPEED,
+          vy: (dy / dist) * COMBAT.DRONE_BULLET_SPEED,
+          radius: 4.8,
+          overdrive: false,
+          isDrone: true,
+          damageRatio: COMBAT.DRONE_DAMAGE_RATIO,
+        })
+      );
+    }
+  }
+
+  triggerUltimate(engine) {
+    if (engine.gameState !== 'PLAYING' || engine.ultimateCharge < 100) return false;
+
+    engine.ultimateCharge = 0;
+    engine.ultimateBeamTimer = COMBAT.ULTIMATE_BEAM_DURATION;
+    engine.invulnerableTimer = Math.max(engine.invulnerableTimer, 2.0);
+    engine.triggerShake(15, 0.4);
+    engine.addShockwave(engine.cannon.x, engine.cannon.y - 40, 420, 'rgba(72, 219, 251, 0.9)');
+    engine.addFloatingText(engine.width / 2, engine.height * 0.36, '☄️ ORBITAL SUPERNOVA!', '#48dbfb', 20);
+
+    const ultDamage = Math.max(15, Math.round(engine.getBulletDamage() * 14));
+    const save = engine.saveManager.state;
+
+    for (let j = engine.rocks.length - 1; j >= 0; j--) {
+      const r = engine.rocks[j];
+      r.armorBroken = true;
+      r.bossShieldTimer = 0;
+      const actualDmg = Math.min(r.hp, ultDamage);
+      r.hp -= actualDmg;
+      engine.score += actualDmg;
+      engine.waveSystem.waveDamageDealt += actualDmg;
+      if (engine.score > save.bestScore) {
+        save.bestScore = engine.score;
+      }
+
+      r.vy = -480;
+      r.hitScale = 1.3;
+      r.hitFlash = 0.6;
+      engine.addParticles(r.x, r.y, '#48dbfb', 10, 220);
+
+      if (r.hp <= 0) {
+        this.destroyRock(r, j, engine, true);
+      }
+    }
+
+    this.bus.emit('sfx:ultimate');
+    this.bus.emit('ultimate:updated', engine.ultimateCharge);
+    this.bus.emit('hud:scoreUpdated');
+    this.bus.emit('wave:updated', {
+      waveNum: save.wave,
+      damageDealt: engine.waveSystem.waveDamageDealt,
+      totalHP: engine.waveSystem.waveTotalHP,
+    });
+    return true;
+  }
+
   updateBullets(dt, engine) {
     const { bullets, bulletPool, rocks, width, saveManager, waveSystem } = engine;
     const save = saveManager.state;
-    const bulletDmg = engine.getBulletDamage();
+    const baseBulletDmg = engine.getBulletDamage();
 
     for (let i = bullets.length - 1; i >= 0; i--) {
       const b = bullets[i];
       b.x += b.vx * dt;
       b.y += b.vy * dt;
 
-      if (b.y < -30 || b.x < -20 || b.x > width + 20) {
+      if (b.y < -30 || b.y > engine.height + 20 || b.x < -20 || b.x > width + 20) {
         bullets.splice(i, 1);
         bulletPool.release(b);
         continue;
@@ -62,24 +149,46 @@ export class CombatSystem {
         if (distSq <= (r.radius + b.radius) ** 2) {
           hit = true;
 
-          // Check Titan Boss temporary Aegis shield
           if (r.bossShieldTimer > 0) {
             this.bus.emit('sfx:hit', { hpRatio: 1, armored: true });
             engine.addParticles(b.x, b.y, '#48dbfb', 4, 110);
             break;
           }
 
-          // Armored Rock takes reduced damage while armor is intact
+          // Roll Critical Hit
+          const isCrit = !b.isDrone && Math.random() < COMBAT.CRIT_CHANCE;
+          const critMult = isCrit ? COMBAT.CRIT_MULTIPLIER : 1.0;
+          const scaledDmg = Math.max(1, Math.round(baseBulletDmg * (b.damageRatio || 1) * critMult));
+
           const hasIntactArmor = r.variant === 'armored' && !r.armorBroken;
           const armorScale = ROCK_VARIANTS.armored.armorDamageScale;
-          const rawDmg = hasIntactArmor ? Math.max(1, Math.round(bulletDmg * armorScale)) : bulletDmg;
+          const rawDmg = hasIntactArmor ? Math.max(1, Math.round(scaledDmg * armorScale)) : scaledDmg;
           const actualDmg = Math.min(r.hp, rawDmg);
 
           r.hp -= actualDmg;
-          engine.score += actualDmg;
+
+          // Build Combo & Ultimate Charge
+          engine.comboCount += 1;
+          engine.comboTimer = COMBAT.COMBO_DECAY_TIME;
+          const comboMult = getComboMultiplier(engine.comboCount);
+          const scoreGain = Math.round(actualDmg * comboMult);
+
+          engine.score += scoreGain;
           waveSystem.waveDamageDealt += actualDmg;
           if (engine.score > save.bestScore) {
             save.bestScore = engine.score;
+          }
+
+          engine.addUltimateCharge(COMBAT.ULTIMATE_CHARGE_PER_HIT);
+
+          if (isCrit) {
+            engine.addFloatingText(
+              b.x,
+              b.y - 12,
+              `💥 ${formatNum(actualDmg)}!`,
+              '#ff4757',
+              14
+            );
           }
 
           if (hasIntactArmor && r.hp <= r.maxHp * ROCK_VARIANTS.armored.armorBreakThreshold && r.hp > 0) {
@@ -88,18 +197,22 @@ export class CombatSystem {
             engine.addFloatingText(r.x, r.y - r.radius, 'ARMOR CRACKED!', '#dfe4ea', 13);
           }
 
-          r.hitScale = 1.15;
+          r.hitScale = isCrit ? 1.22 : 1.15;
           r.hitFlash = 0.22;
           if (r.vy > -120) r.vy -= 12;
 
           this.bus.emit('sfx:hit', { hpRatio: r.hp / r.maxHp, armored: hasIntactArmor });
-          engine.addParticles(b.x, b.y, hasIntactArmor ? '#dfe4ea' : '#fffa65', 3, 95);
+          engine.addParticles(b.x, b.y, isCrit ? '#ff4757' : hasIntactArmor ? '#dfe4ea' : '#fffa65', isCrit ? 6 : 3, 110);
 
           if (r.hp <= 0) {
-            this.destroyRock(r, j, engine);
+            this.destroyRock(r, j, engine, false);
           }
 
           this.bus.emit('hud:scoreUpdated');
+          this.bus.emit('combo:updated', {
+            count: engine.comboCount,
+            multiplier: comboMult,
+          });
           this.bus.emit('wave:updated', {
             waveNum: save.wave,
             damageDealt: waveSystem.waveDamageDealt,
@@ -116,7 +229,7 @@ export class CombatSystem {
     }
   }
 
-  destroyRock(rock, index, engine) {
+  destroyRock(rock, index, engine, fromUltimate = false) {
     const { rocks, saveManager, waveSystem, achievementTracker } = engine;
     const save = saveManager.state;
     const col = getRockColorTier(rock.maxHp);
@@ -124,6 +237,10 @@ export class CombatSystem {
     engine.addParticles(rock.x, rock.y, col.fill, rock.size * 8, 220);
     this.bus.emit('rock:destroyed', { size: rock.size, isBoss: rock.isBoss });
     engine.triggerShake(rock.size * 3.5, 0.16);
+
+    if (!fromUltimate) {
+      engine.addUltimateCharge(COMBAT.ULTIMATE_CHARGE_PER_KILL);
+    }
 
     save.stats.rocksDestroyed += 1;
     if (rock.isBoss) {

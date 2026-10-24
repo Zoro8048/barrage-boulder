@@ -45,6 +45,7 @@ export class HapticsService {
     this.bus.on('boss:spawned', () => this.vibrate([40, 40, 60]));
     this.bus.on('run:revived', () => this.vibrate(30));
     this.bus.on('run:gameover', () => this.vibrate([60, 50, 90]));
+    this.bus.on('sfx:ultimate', () => this.vibrate([45, 50, 75]));
   }
 
   triggerIosTaptic(pulses = 1) {

@@ -51,6 +51,7 @@ export class ModalController {
     this.skinsBtn = document.getElementById('skins-btn');
     this.statsBtn = document.getElementById('stats-btn');
     this.settingsBtn = document.getElementById('settings-btn');
+    this.modeToggleBtn = document.getElementById('mode-toggle-btn');
     this.openSkinsFooterBtn = document.getElementById('open-skins-footer-btn');
     this.openStatsFooterBtn = document.getElementById('open-stats-footer-btn');
     this.openDisclaimerBtn = document.getElementById('open-disclaimer-btn');
@@ -157,6 +158,18 @@ export class ModalController {
     this.openDisclaimerBtn?.addEventListener('click', openDisclaimer);
     this.openDisclaimerSettingsBtn?.addEventListener('click', openDisclaimer);
 
+    this.modeToggleBtn?.addEventListener('click', () => {
+      this.audioService.init();
+      if (!this.engine.isBossRushUnlocked()) {
+        alert('Reach Wave 6 to unlock Boss Rush Mode (2x Coin Multiplier)!');
+        return;
+      }
+      this.engine.toggleGameMode();
+      this.audioService.playUpgrade();
+      this.updateModeButton();
+      this.bus.emit('run:lobby');
+    });
+
     this.pauseBtn?.addEventListener('click', (e) => {
       e.stopPropagation();
       this.engine.pauseGame();
@@ -218,6 +231,7 @@ export class ModalController {
   }
 
   updateUpgradeButtons() {
+    this.updateModeButton();
     const save = this.engine.saveManager.state;
 
     UPGRADE_TYPES.forEach((type) => {
@@ -250,6 +264,18 @@ export class ModalController {
         card.classList.add('locked');
       }
     });
+  }
+
+  updateModeButton() {
+    if (!this.modeToggleBtn) return;
+    if (!this.engine.isBossRushUnlocked()) {
+      this.modeToggleBtn.textContent = '🔒 Boss Rush (Wave 6)';
+      return;
+    }
+    this.modeToggleBtn.textContent =
+      this.engine.gameMode === 'BOSS_RUSH'
+        ? '👑 Mode: Boss Rush (2x 🪙)'
+        : '🌊 Mode: Standard';
   }
 
   renderSkinsModal() {

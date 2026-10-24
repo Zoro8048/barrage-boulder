@@ -1,6 +1,6 @@
 /**
  * WaveSystem - Generates wave rock queues, calculates total wave HP (including child splits),
- * and schedules rock spawns.
+ * and schedules rock spawns for both Standard and Boss Rush modes.
  */
 
 import { ROCK_RADII } from '../config/constants.js';
@@ -40,48 +40,70 @@ export class WaveSystem {
     this.spawnTimer = 0.4;
   }
 
-  setupWave(waveNum, isPlaying = false, rng = Math.random) {
+  setupWave(waveNum, isPlaying = false, rng = Math.random, isBossRush = false) {
     this.waveRocksToSpawn = [];
     this.waveDamageDealt = 0;
 
-    const isMilestoneWave = waveNum % 10 === 0;
-    const isBossWave = waveNum % 3 === 0 || isMilestoneWave;
+    const isMilestoneWave = waveNum % 10 === 0 || (isBossRush && waveNum % 3 === 0);
+    const isBossWave = isBossRush || waveNum % 3 === 0 || isMilestoneWave;
 
     const baseHP = Math.max(2, Math.round(4 * Math.pow(1.33, waveNum - 1)));
-    const rockCount = isMilestoneWave
-      ? 3 + Math.min(4, Math.floor(waveNum * 0.4))
-      : 4 + Math.min(8, Math.floor(waveNum * 0.85));
 
-    for (let i = 0; i < rockCount; i++) {
-      const isFinalRock = i === rockCount - 1;
-      const isBoss = isFinalRock && isBossWave;
-      let size = 2;
+    if (isBossRush) {
+      // Boss Rush Mode: 2 to 3 high-intensity Boss & Escort boulders per wave
+      const bossCount = 2 + (waveNum >= 5 ? 1 : 0);
+      for (let i = 0; i < bossCount; i++) {
+        const isFinal = i === bossCount - 1;
+        const isMilestone = isFinal && isMilestoneWave;
+        const variant = isMilestone ? 'milestoneBoss' : isFinal ? 'boss' : pickRockVariant(waveNum, true, false, rng);
+        const size = isFinal ? 3 : 2;
+        const sizeMult = isMilestone ? 3.8 : isFinal ? 2.6 : 1.6;
+        const hp = Math.max(2, Math.round(baseHP * sizeMult));
 
-      if (isBoss) {
-        size = 3;
-      } else if (isFinalRock && waveNum >= 2) {
-        size = 3;
-      } else if (rng() < 0.35) {
-        size = 1;
-      } else if (waveNum >= 3 && rng() < 0.3) {
-        size = 3;
+        this.waveRocksToSpawn.push({
+          size,
+          hp,
+          isBoss: true,
+          isMilestone,
+          variant,
+        });
       }
+    } else {
+      const rockCount = isMilestoneWave
+        ? 3 + Math.min(4, Math.floor(waveNum * 0.4))
+        : 4 + Math.min(8, Math.floor(waveNum * 0.85));
 
-      const variant = pickRockVariant(waveNum, isBoss, isBoss && isMilestoneWave, rng);
-      let sizeMult = size === 3 ? 2.2 : size === 2 ? 1.2 : 0.6;
-      if (variant === 'milestoneBoss') sizeMult = 4.2;
-      else if (variant === 'boss') sizeMult = 2.8;
-      else if (variant === 'fast') sizeMult *= 0.78;
+      for (let i = 0; i < rockCount; i++) {
+        const isFinalRock = i === rockCount - 1;
+        const isBoss = isFinalRock && isBossWave;
+        let size = 2;
 
-      const hp = Math.max(1, Math.round(baseHP * sizeMult * (0.85 + rng() * 0.3)));
+        if (isBoss) {
+          size = 3;
+        } else if (isFinalRock && waveNum >= 2) {
+          size = 3;
+        } else if (rng() < 0.35) {
+          size = 1;
+        } else if (waveNum >= 3 && rng() < 0.3) {
+          size = 3;
+        }
 
-      this.waveRocksToSpawn.push({
-        size,
-        hp,
-        isBoss,
-        isMilestone: variant === 'milestoneBoss',
-        variant,
-      });
+        const variant = pickRockVariant(waveNum, isBoss, isBoss && isMilestoneWave, rng);
+        let sizeMult = size === 3 ? 2.2 : size === 2 ? 1.2 : 0.6;
+        if (variant === 'milestoneBoss') sizeMult = 4.2;
+        else if (variant === 'boss') sizeMult = 2.8;
+        else if (variant === 'fast') sizeMult *= 0.78;
+
+        const hp = Math.max(1, Math.round(baseHP * sizeMult * (0.85 + rng() * 0.3)));
+
+        this.waveRocksToSpawn.push({
+          size,
+          hp,
+          isBoss,
+          isMilestone: variant === 'milestoneBoss',
+          variant,
+        });
+      }
     }
 
     this.waveTotalHP = calculateWaveTotalHP(this.waveRocksToSpawn);

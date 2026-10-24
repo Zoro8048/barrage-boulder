@@ -49,6 +49,9 @@ function bootstrap() {
         engine.resumeGame();
       }
     },
+    onTriggerUltimate: () => {
+      engine.activateUltimate();
+    },
   });
 
   modalController = new ModalController({

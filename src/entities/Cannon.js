@@ -1,8 +1,8 @@
 /**
- * Cannon Entity - Represents the player's mobile turret and extensible weapon slots.
+ * Cannon Entity - Represents the player's mobile turret and extensible Wingman Drone slots.
  */
 
-import { PHYSICS } from '../config/constants.js';
+import { PHYSICS, COMBAT } from '../config/constants.js';
 import { clamp } from '../core/utils.js';
 
 export class Cannon {
@@ -14,9 +14,9 @@ export class Cannon {
     this.wheelAngle = 0;
     this.recoil = 0;
     this.shootCooldown = 0;
+    this.droneCooldown = COMBAT.DRONE_FIRE_INTERVAL;
+    this.droneBobPhase = 0;
     this.muzzleFlash = 0;
-    // Extensible attachment slots for future drones / sub-weapons
-    this.attachments = [];
   }
 
   setBounds(width, groundY) {
@@ -46,9 +46,11 @@ export class Cannon {
 
     const dx = this.x - prevX;
     this.wheelAngle += dx / 13;
+    this.droneBobPhase += dt * 4.5;
 
     if (this.recoil > 0) this.recoil = Math.max(0, this.recoil - dt * 28);
     if (this.muzzleFlash > 0) this.muzzleFlash = Math.max(0, this.muzzleFlash - dt * 14);
     if (this.shootCooldown > 0) this.shootCooldown -= dt;
+    if (this.droneCooldown > 0) this.droneCooldown -= dt;
   }
 }

@@ -17,6 +17,7 @@
     POWERUP_GRAVITY: 320,
     PARTICLE_GRAVITY: 260,
     GROUND_HEIGHT: 96,
+    LOBBY_GROUND_HEIGHT: 220,
     KEY_MOVE_SPEED: 420,
     CANNON_TRACK_SMOOTHING: 22,
     CANNON_RADIUS: 26,
@@ -28,6 +29,17 @@
     BOOSTED_MAGNET_SPEED: 850,
     REVIVE_SHIELD_DURATION: 3.5,
     CRYO_TIME_SCALE: 0.45,
+  };
+  const COMBAT = {
+    CRIT_CHANCE: 0.12,
+    CRIT_MULTIPLIER: 2.0,
+    COMBO_DECAY_TIME: 2.8,
+    ULTIMATE_CHARGE_PER_HIT: 2.2,
+    ULTIMATE_CHARGE_PER_KILL: 8.0,
+    ULTIMATE_BEAM_DURATION: 0.85,
+    DRONE_FIRE_INTERVAL: 0.65,
+    DRONE_BULLET_SPEED: 680,
+    DRONE_DAMAGE_RATIO: 0.55,
   };
   const ROCK_RADII = {
     1: 24,
@@ -560,6 +572,18 @@
     if (fireRateLevel >= 4) return 2;
     return 1;
   }
+  function getDroneCount(highestWave = 1, firePowerLevel = 1) {
+    if (highestWave >= 12 || firePowerLevel >= 10) return 2;
+    if (highestWave >= 5 || firePowerLevel >= 5) return 1;
+    return 0;
+  }
+  function getComboMultiplier(comboCount = 0) {
+    if (comboCount >= 50) return 2.5;
+    if (comboCount >= 25) return 2.0;
+    if (comboCount >= 10) return 1.5;
+    if (comboCount >= 5) return 1.2;
+    return 1.0;
+  }
   function getBulletDamage(firePowerLevel = 1) {
     const lvl = Math.max(1, firePowerLevel);
     return Math.round(lvl + Math.pow(lvl - 1, 1.35) * 0.6);
@@ -567,9 +591,10 @@
   function getBaseCoinMultiplier(coinValueLevel = 1) {
     return 1 + (Math.max(1, coinValueLevel) - 1) * UPGRADE_CONFIG.coinValue.multiplierPerLevel;
   }
-  function getCoinMultiplier(coinValueLevel = 1, isMagnetActive = false) {
+  function getCoinMultiplier(coinValueLevel = 1, isMagnetActive = false, isBossRush = false) {
     const base = getBaseCoinMultiplier(coinValueLevel);
-    return isMagnetActive ? base * UPGRADE_CONFIG.coinValue.magnetBonusMultiplier : base;
+    const magnetMult = isMagnetActive ? base * UPGRADE_CONFIG.coinValue.magnetBonusMultiplier : base;
+    return isBossRush ? magnetMult * 2.0 : magnetMult;
   }
   function getOfflineCoinsPerMinute(offlineLevel = 1) {
     const cfg = UPGRADE_CONFIG.offlineEarnings;
@@ -733,7 +758,7 @@
 
   // --- Module: src/entities/Cannon.js ---
   /**
-   * Cannon Entity - Represents the player's mobile turret and extensible weapon slots.
+   * Cannon Entity - Represents the player's mobile turret and extensible Wingman Drone slots.
    */
   class Cannon {
     constructor(x = 200, y = 600) {
@@ -744,9 +769,9 @@
       this.wheelAngle = 0;
       this.recoil = 0;
       this.shootCooldown = 0;
+      this.droneCooldown = COMBAT.DRONE_FIRE_INTERVAL;
+      this.droneBobPhase = 0;
       this.muzzleFlash = 0;
-      // Extensible attachment slots for future drones / sub-weapons
-      this.attachments = [];
     }
   
     setBounds(width, groundY) {
@@ -776,10 +801,12 @@
   
       const dx = this.x - prevX;
       this.wheelAngle += dx / 13;
+      this.droneBobPhase += dt * 4.5;
   
       if (this.recoil > 0) this.recoil = Math.max(0, this.recoil - dt * 28);
       if (this.muzzleFlash > 0) this.muzzleFlash = Math.max(0, this.muzzleFlash - dt * 14);
       if (this.shootCooldown > 0) this.shootCooldown -= dt;
+      if (this.droneCooldown > 0) this.droneCooldown -= dt;
     }
   }
 
@@ -841,7 +868,7 @@
   // --- Module: src/systems/WaveSystem.js ---
   /**
    * WaveSystem - Generates wave rock queues, calculates total wave HP (including child splits),
-   * and schedules rock spawns.
+   * and schedules rock spawns for both Standard and Boss Rush modes.
    */
   function pickRockVariant(waveNum, isBoss, isMilestone, rng = Math.random) {
     if (isMilestone) return 'milestoneBoss';
@@ -875,48 +902,70 @@
       this.spawnTimer = 0.4;
     }
   
-    setupWave(waveNum, isPlaying = false, rng = Math.random) {
+    setupWave(waveNum, isPlaying = false, rng = Math.random, isBossRush = false) {
       this.waveRocksToSpawn = [];
       this.waveDamageDealt = 0;
   
-      const isMilestoneWave = waveNum % 10 === 0;
-      const isBossWave = waveNum % 3 === 0 || isMilestoneWave;
+      const isMilestoneWave = waveNum % 10 === 0 || (isBossRush && waveNum % 3 === 0);
+      const isBossWave = isBossRush || waveNum % 3 === 0 || isMilestoneWave;
   
       const baseHP = Math.max(2, Math.round(4 * Math.pow(1.33, waveNum - 1)));
-      const rockCount = isMilestoneWave
-        ? 3 + Math.min(4, Math.floor(waveNum * 0.4))
-        : 4 + Math.min(8, Math.floor(waveNum * 0.85));
   
-      for (let i = 0; i < rockCount; i++) {
-        const isFinalRock = i === rockCount - 1;
-        const isBoss = isFinalRock && isBossWave;
-        let size = 2;
+      if (isBossRush) {
+        // Boss Rush Mode: 2 to 3 high-intensity Boss & Escort boulders per wave
+        const bossCount = 2 + (waveNum >= 5 ? 1 : 0);
+        for (let i = 0; i < bossCount; i++) {
+          const isFinal = i === bossCount - 1;
+          const isMilestone = isFinal && isMilestoneWave;
+          const variant = isMilestone ? 'milestoneBoss' : isFinal ? 'boss' : pickRockVariant(waveNum, true, false, rng);
+          const size = isFinal ? 3 : 2;
+          const sizeMult = isMilestone ? 3.8 : isFinal ? 2.6 : 1.6;
+          const hp = Math.max(2, Math.round(baseHP * sizeMult));
   
-        if (isBoss) {
-          size = 3;
-        } else if (isFinalRock && waveNum >= 2) {
-          size = 3;
-        } else if (rng() < 0.35) {
-          size = 1;
-        } else if (waveNum >= 3 && rng() < 0.3) {
-          size = 3;
+          this.waveRocksToSpawn.push({
+            size,
+            hp,
+            isBoss: true,
+            isMilestone,
+            variant,
+          });
         }
+      } else {
+        const rockCount = isMilestoneWave
+          ? 3 + Math.min(4, Math.floor(waveNum * 0.4))
+          : 4 + Math.min(8, Math.floor(waveNum * 0.85));
   
-        const variant = pickRockVariant(waveNum, isBoss, isBoss && isMilestoneWave, rng);
-        let sizeMult = size === 3 ? 2.2 : size === 2 ? 1.2 : 0.6;
-        if (variant === 'milestoneBoss') sizeMult = 4.2;
-        else if (variant === 'boss') sizeMult = 2.8;
-        else if (variant === 'fast') sizeMult *= 0.78;
+        for (let i = 0; i < rockCount; i++) {
+          const isFinalRock = i === rockCount - 1;
+          const isBoss = isFinalRock && isBossWave;
+          let size = 2;
   
-        const hp = Math.max(1, Math.round(baseHP * sizeMult * (0.85 + rng() * 0.3)));
+          if (isBoss) {
+            size = 3;
+          } else if (isFinalRock && waveNum >= 2) {
+            size = 3;
+          } else if (rng() < 0.35) {
+            size = 1;
+          } else if (waveNum >= 3 && rng() < 0.3) {
+            size = 3;
+          }
   
-        this.waveRocksToSpawn.push({
-          size,
-          hp,
-          isBoss,
-          isMilestone: variant === 'milestoneBoss',
-          variant,
-        });
+          const variant = pickRockVariant(waveNum, isBoss, isBoss && isMilestoneWave, rng);
+          let sizeMult = size === 3 ? 2.2 : size === 2 ? 1.2 : 0.6;
+          if (variant === 'milestoneBoss') sizeMult = 4.2;
+          else if (variant === 'boss') sizeMult = 2.8;
+          else if (variant === 'fast') sizeMult *= 0.78;
+  
+          const hp = Math.max(1, Math.round(baseHP * sizeMult * (0.85 + rng() * 0.3)));
+  
+          this.waveRocksToSpawn.push({
+            size,
+            hp,
+            isBoss,
+            isMilestone: variant === 'milestoneBoss',
+            variant,
+          });
+        }
       }
   
       this.waveTotalHP = calculateWaveTotalHP(this.waveRocksToSpawn);
@@ -1049,6 +1098,11 @@
         if (e.code === 'Escape' || e.code === 'KeyP') {
           e.preventDefault();
           this.callbacks.onTogglePause?.();
+          return;
+        }
+        if (e.code === 'KeyE' || e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
+          e.preventDefault();
+          this.callbacks.onTriggerUltimate?.();
           return;
         }
         if (e.code === 'ArrowLeft' || e.code === 'ArrowRight' || e.code === 'Space') {
@@ -1300,8 +1354,8 @@
 
   // --- Module: src/systems/CombatSystem.js ---
   /**
-   * CombatSystem - Handles volley firing, bullet-to-rock collisions, armor cracking,
-   * rock splitting, boss abilities, and healer pulses.
+   * CombatSystem - Handles volley firing, Wingman Drone targeting, Critical Hits,
+   * Combo multipliers, Ultimate Supernova Beam, armor cracking, rock splitting, and boss skills.
    */
   class CombatSystem {
     constructor(bus) {
@@ -1325,6 +1379,8 @@
             vy: isOverdrive ? PHYSICS.BULLET_SPEED_OVERDRIVE : PHYSICS.BULLET_SPEED_NORMAL,
             radius: isOverdrive ? 6.2 : 5.5,
             overdrive: isOverdrive,
+            isDrone: false,
+            damageRatio: 1.0,
           })
         );
       }
@@ -1334,17 +1390,101 @@
       this.bus.emit('sfx:shoot', { overdrive: isOverdrive });
     }
   
+    fireDrones(engine) {
+      const { cannon, rocks, bullets, bulletPool } = engine;
+      const droneCount = engine.getDroneCount();
+      if (droneCount <= 0 || rocks.length === 0) return;
+  
+      // Target the boulder closest to the ground
+      let target = rocks[0];
+      for (const r of rocks) {
+        if (r.y + r.radius > target.y + target.radius) {
+          target = r;
+        }
+      }
+  
+      const offsets = droneCount >= 2 ? [-44, 44] : [-44];
+      const bobY = Math.sin(cannon.droneBobPhase) * 4;
+  
+      for (const ox of offsets) {
+        const sx = cannon.x + ox;
+        const sy = cannon.y - 34 + bobY;
+        const dx = target.x - sx;
+        const dy = target.y - sy;
+        const dist = Math.hypot(dx, dy) || 1;
+  
+        bullets.push(
+          bulletPool.acquire({
+            x: sx,
+            y: sy,
+            vx: (dx / dist) * COMBAT.DRONE_BULLET_SPEED,
+            vy: (dy / dist) * COMBAT.DRONE_BULLET_SPEED,
+            radius: 4.8,
+            overdrive: false,
+            isDrone: true,
+            damageRatio: COMBAT.DRONE_DAMAGE_RATIO,
+          })
+        );
+      }
+    }
+  
+    triggerUltimate(engine) {
+      if (engine.gameState !== 'PLAYING' || engine.ultimateCharge < 100) return false;
+  
+      engine.ultimateCharge = 0;
+      engine.ultimateBeamTimer = COMBAT.ULTIMATE_BEAM_DURATION;
+      engine.invulnerableTimer = Math.max(engine.invulnerableTimer, 2.0);
+      engine.triggerShake(15, 0.4);
+      engine.addShockwave(engine.cannon.x, engine.cannon.y - 40, 420, 'rgba(72, 219, 251, 0.9)');
+      engine.addFloatingText(engine.width / 2, engine.height * 0.36, '☄️ ORBITAL SUPERNOVA!', '#48dbfb', 20);
+  
+      const ultDamage = Math.max(15, Math.round(engine.getBulletDamage() * 14));
+      const save = engine.saveManager.state;
+  
+      for (let j = engine.rocks.length - 1; j >= 0; j--) {
+        const r = engine.rocks[j];
+        r.armorBroken = true;
+        r.bossShieldTimer = 0;
+        const actualDmg = Math.min(r.hp, ultDamage);
+        r.hp -= actualDmg;
+        engine.score += actualDmg;
+        engine.waveSystem.waveDamageDealt += actualDmg;
+        if (engine.score > save.bestScore) {
+          save.bestScore = engine.score;
+        }
+  
+        r.vy = -480;
+        r.hitScale = 1.3;
+        r.hitFlash = 0.6;
+        engine.addParticles(r.x, r.y, '#48dbfb', 10, 220);
+  
+        if (r.hp <= 0) {
+          this.destroyRock(r, j, engine, true);
+        }
+      }
+  
+      this.bus.emit('sfx:ultimate');
+      this.bus.emit('ultimate:updated', engine.ultimateCharge);
+      this.bus.emit('hud:scoreUpdated');
+      this.bus.emit('wave:updated', {
+        waveNum: save.wave,
+        damageDealt: engine.waveSystem.waveDamageDealt,
+        totalHP: engine.waveSystem.waveTotalHP,
+      });
+      return true;
+    }
+  
     updateBullets(dt, engine) {
       const { bullets, bulletPool, rocks, width, saveManager, waveSystem } = engine;
       const save = saveManager.state;
-      const bulletDmg = engine.getBulletDamage();
+      const baseBulletDmg = engine.getBulletDamage();
   
       for (let i = bullets.length - 1; i >= 0; i--) {
         const b = bullets[i];
         b.x += b.vx * dt;
         b.y += b.vy * dt;
   
-        if (b.y < -30 || b.x < -20 || b.x > width + 20) {
+        if (b.y < -30 || b.y > engine.height + 20 || b.x < -20 || b.x > width + 20) {
           bullets.splice(i, 1);
           bulletPool.release(b);
           continue;
@@ -1357,24 +1497,46 @@
           if (distSq <= (r.radius + b.radius) ** 2) {
             hit = true;
   
-            // Check Titan Boss temporary Aegis shield
             if (r.bossShieldTimer > 0) {
               this.bus.emit('sfx:hit', { hpRatio: 1, armored: true });
               engine.addParticles(b.x, b.y, '#48dbfb', 4, 110);
               break;
             }
   
-            // Armored Rock takes reduced damage while armor is intact
+            // Roll Critical Hit
+            const isCrit = !b.isDrone && Math.random() < COMBAT.CRIT_CHANCE;
+            const critMult = isCrit ? COMBAT.CRIT_MULTIPLIER : 1.0;
+            const scaledDmg = Math.max(1, Math.round(baseBulletDmg * (b.damageRatio || 1) * critMult));
+  
             const hasIntactArmor = r.variant === 'armored' && !r.armorBroken;
             const armorScale = ROCK_VARIANTS.armored.armorDamageScale;
-            const rawDmg = hasIntactArmor ? Math.max(1, Math.round(bulletDmg * armorScale)) : bulletDmg;
+            const rawDmg = hasIntactArmor ? Math.max(1, Math.round(scaledDmg * armorScale)) : scaledDmg;
             const actualDmg = Math.min(r.hp, rawDmg);
   
             r.hp -= actualDmg;
-            engine.score += actualDmg;
+  
+            // Build Combo & Ultimate Charge
+            engine.comboCount += 1;
+            engine.comboTimer = COMBAT.COMBO_DECAY_TIME;
+            const comboMult = getComboMultiplier(engine.comboCount);
+            const scoreGain = Math.round(actualDmg * comboMult);
+  
+            engine.score += scoreGain;
             waveSystem.waveDamageDealt += actualDmg;
             if (engine.score > save.bestScore) {
               save.bestScore = engine.score;
+            }
+  
+            engine.addUltimateCharge(COMBAT.ULTIMATE_CHARGE_PER_HIT);
+  
+            if (isCrit) {
+              engine.addFloatingText(
+                b.x,
+                b.y - 12,
+                `💥 ${formatNum(actualDmg)}!`,
+                '#ff4757',
+                14
+              );
             }
   
             if (hasIntactArmor && r.hp <= r.maxHp * ROCK_VARIANTS.armored.armorBreakThreshold && r.hp > 0) {
@@ -1383,18 +1545,22 @@
               engine.addFloatingText(r.x, r.y - r.radius, 'ARMOR CRACKED!', '#dfe4ea', 13);
             }
   
-            r.hitScale = 1.15;
+            r.hitScale = isCrit ? 1.22 : 1.15;
             r.hitFlash = 0.22;
             if (r.vy > -120) r.vy -= 12;
   
             this.bus.emit('sfx:hit', { hpRatio: r.hp / r.maxHp, armored: hasIntactArmor });
-            engine.addParticles(b.x, b.y, hasIntactArmor ? '#dfe4ea' : '#fffa65', 3, 95);
+            engine.addParticles(b.x, b.y, isCrit ? '#ff4757' : hasIntactArmor ? '#dfe4ea' : '#fffa65', isCrit ? 6 : 3, 110);
   
             if (r.hp <= 0) {
-              this.destroyRock(r, j, engine);
+              this.destroyRock(r, j, engine, false);
             }
   
             this.bus.emit('hud:scoreUpdated');
+            this.bus.emit('combo:updated', {
+              count: engine.comboCount,
+              multiplier: comboMult,
+            });
             this.bus.emit('wave:updated', {
               waveNum: save.wave,
               damageDealt: waveSystem.waveDamageDealt,
@@ -1411,7 +1577,7 @@
       }
     }
   
-    destroyRock(rock, index, engine) {
+    destroyRock(rock, index, engine, fromUltimate = false) {
       const { rocks, saveManager, waveSystem, achievementTracker } = engine;
       const save = saveManager.state;
       const col = getRockColorTier(rock.maxHp);
@@ -1419,6 +1585,10 @@
       engine.addParticles(rock.x, rock.y, col.fill, rock.size * 8, 220);
       this.bus.emit('rock:destroyed', { size: rock.size, isBoss: rock.isBoss });
       engine.triggerShake(rock.size * 3.5, 0.16);
+  
+      if (!fromUltimate) {
+        engine.addUltimateCharge(COMBAT.ULTIMATE_CHARGE_PER_KILL);
+      }
   
       save.stats.rocksDestroyed += 1;
       if (rock.isBoss) {
@@ -1558,6 +1728,7 @@
       this.groundY = 600;
   
       this.gameState = 'LOBBY';
+      this.gameMode = 'STANDARD'; // 'STANDARD' | 'BOSS_RUSH'
       this.score = 0;
       this.runCoins = 0;
       this.usedRevive = false;
@@ -1565,6 +1736,12 @@
       this.intermissionLockTimer = 0;
       this.shakeTimer = 0;
       this.shakeIntensity = 0;
+  
+      // Combo & Ultimate Skill State
+      this.comboCount = 0;
+      this.comboTimer = 0;
+      this.ultimateCharge = 0;
+      this.ultimateBeamTimer = 0;
   
       this.activePowerups = {
         rapidFire: 0,
@@ -1595,6 +1772,8 @@
         vy: 0,
         radius: 5.5,
         overdrive: false,
+        isDrone: false,
+        damageRatio: 1.0,
       }));
   
       this.particlePool = new ObjectPool(() => ({
@@ -1622,7 +1801,9 @@
     setViewport(width, height) {
       this.width = width;
       this.height = height;
-      this.groundY = height - PHYSICS.GROUND_HEIGHT;
+      const groundH =
+        this.gameState === 'LOBBY' ? PHYSICS.LOBBY_GROUND_HEIGHT : PHYSICS.GROUND_HEIGHT;
+      this.groundY = height - groundH;
       this.cannon.setBounds(width, this.groundY);
     }
   
@@ -1638,6 +1819,11 @@
       return getBarrelCount(this.saveManager.state.upgrades.fireRate);
     }
   
+    getDroneCount() {
+      const save = this.saveManager.state;
+      return getDroneCount(save.stats.highestWave, save.upgrades.firePower);
+    }
+  
     getBulletDamage() {
       return getBulletDamage(this.saveManager.state.upgrades.firePower);
     }
@@ -1645,8 +1831,33 @@
     getCoinMultiplier() {
       return getCoinMultiplier(
         this.saveManager.state.upgrades.coinValue,
-        this.activePowerups.magnet > 0
+        this.activePowerups.magnet > 0,
+        this.gameMode === 'BOSS_RUSH'
       );
+    }
+  
+    isBossRushUnlocked() {
+      return this.saveManager.state.stats.highestWave >= 6;
+    }
+  
+    toggleGameMode() {
+      if (!this.isBossRushUnlocked()) return false;
+      this.gameMode = this.gameMode === 'STANDARD' ? 'BOSS_RUSH' : 'STANDARD';
+      this.setupCurrentWave();
+      this.bus.emit('mode:changed', this.gameMode);
+      return true;
+    }
+  
+    addUltimateCharge(amount) {
+      const prev = this.ultimateCharge;
+      this.ultimateCharge = Math.min(100, this.ultimateCharge + amount);
+      if (this.ultimateCharge !== prev) {
+        this.bus.emit('ultimate:updated', this.ultimateCharge);
+      }
+    }
+  
+    activateUltimate() {
+      return this.combatSystem.triggerUltimate(this);
     }
   
     // --- VFX & Drop Spawners ---
@@ -1784,7 +1995,12 @@
         save.stats.highestWave = save.wave;
         this.saveManager.persist();
       }
-      this.waveSystem.setupWave(save.wave, this.gameState === 'PLAYING');
+      this.waveSystem.setupWave(
+        save.wave,
+        this.gameState === 'PLAYING',
+        Math.random,
+        this.gameMode === 'BOSS_RUSH'
+      );
     }
   
     startRun() {
@@ -1794,6 +2010,7 @@
       this.saveManager.persist();
       this.setupCurrentWave();
       this.bus.emit('run:started');
+      this.bus.emit('ultimate:updated', this.ultimateCharge);
     }
   
     pauseGame() {
@@ -1858,6 +2075,9 @@
     triggerGameOver() {
       if (this.gameState === 'GAMEOVER') return;
       this.gameState = 'GAMEOVER';
+      this.comboCount = 0;
+      this.comboTimer = 0;
+      this.bus.emit('combo:updated', { count: 0, multiplier: 1 });
       this.triggerShake(14, 0.35);
       this.addParticles(this.cannon.x, this.cannon.y - 18, '#38b6ff', 28, 280);
   
@@ -1891,6 +2111,10 @@
       this.score = 0;
       this.runCoins = 0;
       this.usedRevive = false;
+      this.comboCount = 0;
+      this.comboTimer = 0;
+      this.ultimateCharge = 0;
+      this.ultimateBeamTimer = 0;
       Object.keys(this.activePowerups).forEach((k) => (this.activePowerups[k] = 0));
   
       this.bullets.forEach((b) => this.bulletPool.release(b));
@@ -1906,6 +2130,8 @@
   
       this.setupCurrentWave();
       this.bus.emit('run:lobby');
+      this.bus.emit('combo:updated', { count: 0, multiplier: 1 });
+      this.bus.emit('ultimate:updated', this.ultimateCharge);
       this.bus.emit('powerup:updated', this.activePowerups);
     }
   
@@ -1920,7 +2146,10 @@
         this.intermissionLockTimer = Math.max(0, this.intermissionLockTimer - dt);
       }
   
-      // Freeze simulation while paused or while a modal dialog is open
+      if (this.ultimateBeamTimer > 0) {
+        this.ultimateBeamTimer = Math.max(0, this.ultimateBeamTimer - dt);
+      }
+  
       if (this.gameState === 'PAUSED' || isModalOpen) {
         return;
       }
@@ -1929,8 +2158,8 @@
         this.invulnerableTimer -= dt;
       }
   
-      // Tick active power-up durations only during active combat
       if (this.gameState === 'PLAYING') {
+        // Tick active power-up durations
         let powerupChanged = false;
         for (const key of Object.keys(this.activePowerups)) {
           if (this.activePowerups[key] > 0) {
@@ -1941,7 +2170,26 @@
         if (powerupChanged) {
           this.bus.emit('powerup:updated', this.activePowerups);
         }
+  
+        // Tick Combo decay timer
+        if (this.comboTimer > 0) {
+          this.comboTimer -= dt;
+          if (this.comboTimer <= 0) {
+            this.comboCount = 0;
+            this.bus.emit('combo:updated', { count: 0, multiplier: 1 });
+          }
+        }
       }
+  
+      const targetGroundH =
+        this.gameState === 'LOBBY' ? PHYSICS.LOBBY_GROUND_HEIGHT : PHYSICS.GROUND_HEIGHT;
+      const targetGroundY = this.height - targetGroundH;
+      if (Math.abs(this.groundY - targetGroundY) > 0.5) {
+        this.groundY += (targetGroundY - this.groundY) * Math.min(1, dt * 12);
+      } else {
+        this.groundY = targetGroundY;
+      }
+      this.cannon.y = this.groundY;
   
       const keyDir = this.gameState !== 'GAMEOVER' ? inputSystem.getKeyMoveDirection() : 0;
       this.cannon.update(dt, this.width, keyDir);
@@ -1951,6 +2199,11 @@
         if (this.cannon.shootCooldown <= 0) {
           this.cannon.shootCooldown = fireInterval;
           this.combatSystem.fireVolley(this);
+        }
+  
+        if (this.cannon.droneCooldown <= 0 && this.getDroneCount() > 0) {
+          this.cannon.droneCooldown = COMBAT.DRONE_FIRE_INTERVAL;
+          this.combatSystem.fireDrones(this);
         }
       }
   
@@ -2066,12 +2319,17 @@
       // Bullets
       this.drawBullets(engine.bullets, skin);
   
+      // Orbital Ultimate Beam
+      if (engine.ultimateBeamTimer > 0) {
+        this.drawUltimateBeam(engine);
+      }
+  
       // Rocks
       for (const r of engine.rocks) {
         this.drawRock(r, engine.activePowerups.freeze > 0);
       }
   
-      // Cannon
+      // Cannon & Wingman Drones
       this.drawCannon(skin);
   
       // Ground
@@ -2201,6 +2459,18 @@
       const { ctx } = this;
       for (const b of bullets) {
         ctx.save();
+        if (b.isDrone) {
+          ctx.beginPath();
+          ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
+          ctx.fillStyle = '#00d2d3';
+          ctx.fill();
+          ctx.lineWidth = 1.5;
+          ctx.strokeStyle = '#ffffff';
+          ctx.stroke();
+          ctx.restore();
+          continue;
+        }
+  
         const grad = ctx.createLinearGradient(b.x, b.y - 10, b.x, b.y + 10);
         if (b.overdrive) {
           grad.addColorStop(0, '#ffffff');
@@ -2217,6 +2487,28 @@
         ctx.fill();
         ctx.restore();
       }
+    }
+  
+    drawUltimateBeam(engine) {
+      const { ctx } = this;
+      const { cannon, ultimateBeamTimer } = engine;
+      const alpha = Math.min(1, ultimateBeamTimer * 1.4);
+  
+      ctx.save();
+      ctx.globalAlpha = alpha;
+  
+      // Wide outer plasma pillar
+      const beamGrad = ctx.createLinearGradient(cannon.x - 45, 0, cannon.x + 45, 0);
+      beamGrad.addColorStop(0, 'rgba(72, 219, 251, 0)');
+      beamGrad.addColorStop(0.25, 'rgba(72, 219, 251, 0.55)');
+      beamGrad.addColorStop(0.5, 'rgba(255, 255, 255, 0.95)');
+      beamGrad.addColorStop(0.75, 'rgba(72, 219, 251, 0.55)');
+      beamGrad.addColorStop(1, 'rgba(72, 219, 251, 0)');
+  
+      ctx.fillStyle = beamGrad;
+      ctx.fillRect(cannon.x - 45, 0, 90, cannon.y - 36);
+  
+      ctx.restore();
     }
   
     drawRock(r, isFrozen) {
@@ -2384,6 +2676,45 @@
       this.drawWheel(-17, -11, 11, cannon.wheelAngle, skin.wheelRim);
       this.drawWheel(17, -11, 11, cannon.wheelAngle, skin.wheelRim);
   
+      // Wingman Helper Drones
+      const droneCount = engine.getDroneCount();
+      if (droneCount > 0) {
+        const bobY = Math.sin(cannon.droneBobPhase) * 4;
+        this.drawDrone(-44, -34 + bobY, skin);
+        if (droneCount >= 2) {
+          this.drawDrone(44, -34 - bobY, skin);
+        }
+      }
+  
+      ctx.restore();
+    }
+  
+    drawDrone(dx, dy, skin) {
+      const { ctx } = this;
+      ctx.save();
+      ctx.translate(dx, dy);
+  
+      // Thruster flame
+      ctx.fillStyle = 'rgba(72, 219, 251, 0.75)';
+      ctx.beginPath();
+      ctx.arc(0, 9, 4, 0, Math.PI * 2);
+      ctx.fill();
+  
+      // Drone body pod
+      ctx.fillStyle = skin.bodyTop;
+      ctx.beginPath();
+      ctx.roundRect(-9, -7, 18, 14, 5);
+      ctx.fill();
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = skin.rim;
+      ctx.stroke();
+  
+      // Eye core
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(0, 0, 3, 0, Math.PI * 2);
+      ctx.fill();
+  
       ctx.restore();
     }
   
@@ -2444,6 +2775,7 @@
       this.bus.on('sfx:shoot', ({ overdrive } = {}) => this.playShoot(overdrive));
       this.bus.on('sfx:hit', ({ hpRatio, armored } = {}) => this.playHit(hpRatio, armored));
       this.bus.on('sfx:coin', () => this.playCoin());
+      this.bus.on('sfx:ultimate', () => this.playUltimate());
       this.bus.on('rock:destroyed', ({ size } = {}) => this.playSplit(size));
       this.bus.on('powerup:collected', () => this.playPowerup());
       this.bus.on('achievement:unlocked', () => this.playPowerup());
@@ -2651,6 +2983,24 @@
       });
     }
   
+    playUltimate() {
+      if (this.sfxVolume <= 0.01 || !this.ctx) return;
+      const t = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(880, t);
+      osc.frequency.exponentialRampToValueAtTime(95, t + 0.55);
+  
+      gain.gain.setValueAtTime(0.18 * this.sfxVolume, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.58);
+  
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start(t);
+      osc.stop(t + 0.6);
+    }
+  
     playGameOver() {
       if (this.sfxVolume <= 0.01 || !this.ctx) return;
       const t = this.ctx.currentTime;
@@ -2717,6 +3067,7 @@
       this.bus.on('boss:spawned', () => this.vibrate([40, 40, 60]));
       this.bus.on('run:revived', () => this.vibrate(30));
       this.bus.on('run:gameover', () => this.vibrate([60, 50, 90]));
+      this.bus.on('sfx:ultimate', () => this.vibrate([45, 50, 75]));
     }
   
     triggerIosTaptic(pulses = 1) {
@@ -2777,6 +3128,9 @@
       this.coinPillEl = document.getElementById('coin-pill');
       this.currentScoreEl = document.getElementById('current-score');
       this.bestScoreEl = document.getElementById('best-score');
+      this.comboPillEl = document.getElementById('combo-pill');
+      this.ultBtnEl = document.getElementById('ult-btn');
+      this.ultPctEl = document.getElementById('ult-pct');
       this.waveCurrentEl = document.getElementById('wave-current');
       this.waveNextEl = document.getElementById('wave-next');
       this.waveBarFillEl = document.getElementById('wave-bar-fill');
@@ -2830,6 +3184,25 @@
         this.updatePowerupHUD(activePowerups);
       });
   
+      this.bus.on('combo:updated', ({ count, multiplier }) => {
+        if (!this.comboPillEl) return;
+        if (count >= 5) {
+          this.comboPillEl.textContent = `🔥 ${count}x COMBO (${multiplier}x)`;
+          this.comboPillEl.classList.remove('hidden');
+        } else {
+          this.comboPillEl.classList.add('hidden');
+        }
+      });
+  
+      this.bus.on('ultimate:updated', (charge) => {
+        this.updateUltimateHUD(charge);
+      });
+  
+      this.ultBtnEl?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.engine.activateUltimate();
+      });
+  
       this.bus.on('boss:tick', ({ boss, isPlaying }) => {
         this.updateBossHUD(boss, isPlaying);
       });
@@ -2842,21 +3215,26 @@
         this.startPromptEl.classList.add('hidden');
         this.upgradePanelEl.classList.add('hidden');
         this.pauseBtn?.classList.remove('hidden');
+        this.ultBtnEl?.classList.remove('hidden');
       });
   
       this.bus.on('run:resumed', () => {
         this.pauseBtn?.classList.remove('hidden');
+        this.ultBtnEl?.classList.remove('hidden');
       });
   
       this.bus.on('run:gameover', () => {
         this.pauseBtn?.classList.add('hidden');
+        this.ultBtnEl?.classList.add('hidden');
       });
   
       this.bus.on('run:lobby', () => {
         this.updateHUD();
         this.pauseBtn?.classList.add('hidden');
+        this.ultBtnEl?.classList.add('hidden');
         if (this.startPromptTextEl) {
-          this.startPromptTextEl.textContent = `DRAG OR USE ◀ ▶ & SPACE — WAVE ${this.engine.saveManager.state.wave}`;
+          const modePrefix = this.engine.gameMode === 'BOSS_RUSH' ? '👑 BOSS RUSH — ' : '';
+          this.startPromptTextEl.textContent = `${modePrefix}DRAG OR USE ◀ ▶ & SPACE — WAVE ${this.engine.saveManager.state.wave}`;
         }
         this.startPromptEl.classList.remove('hidden');
         this.upgradePanelEl.classList.remove('hidden');
@@ -2908,6 +3286,14 @@
           </div>`;
         })
         .join('');
+    }
+  
+    updateUltimateHUD(charge = 0) {
+      if (!this.ultBtnEl || !this.ultPctEl) return;
+      const pct = Math.floor(charge);
+      const isReady = pct >= 100;
+      this.ultPctEl.textContent = isReady ? 'READY!' : `${pct}%`;
+      this.ultBtnEl.classList.toggle('ready', isReady);
     }
   
     showWaveBanner(title, sub, isBossAlert = false) {
@@ -2973,6 +3359,7 @@
       this.skinsBtn = document.getElementById('skins-btn');
       this.statsBtn = document.getElementById('stats-btn');
       this.settingsBtn = document.getElementById('settings-btn');
+      this.modeToggleBtn = document.getElementById('mode-toggle-btn');
       this.openSkinsFooterBtn = document.getElementById('open-skins-footer-btn');
       this.openStatsFooterBtn = document.getElementById('open-stats-footer-btn');
       this.openDisclaimerBtn = document.getElementById('open-disclaimer-btn');
@@ -3079,6 +3466,18 @@
       this.openDisclaimerBtn?.addEventListener('click', openDisclaimer);
       this.openDisclaimerSettingsBtn?.addEventListener('click', openDisclaimer);
   
+      this.modeToggleBtn?.addEventListener('click', () => {
+        this.audioService.init();
+        if (!this.engine.isBossRushUnlocked()) {
+          alert('Reach Wave 6 to unlock Boss Rush Mode (2x Coin Multiplier)!');
+          return;
+        }
+        this.engine.toggleGameMode();
+        this.audioService.playUpgrade();
+        this.updateModeButton();
+        this.bus.emit('run:lobby');
+      });
+  
       this.pauseBtn?.addEventListener('click', (e) => {
         e.stopPropagation();
         this.engine.pauseGame();
@@ -3140,6 +3539,7 @@
     }
   
     updateUpgradeButtons() {
+      this.updateModeButton();
       const save = this.engine.saveManager.state;
   
       UPGRADE_TYPES.forEach((type) => {
@@ -3172,6 +3572,18 @@
           card.classList.add('locked');
         }
       });
+    }
+  
+    updateModeButton() {
+      if (!this.modeToggleBtn) return;
+      if (!this.engine.isBossRushUnlocked()) {
+        this.modeToggleBtn.textContent = '🔒 Boss Rush (Wave 6)';
+        return;
+      }
+      this.modeToggleBtn.textContent =
+        this.engine.gameMode === 'BOSS_RUSH'
+          ? '👑 Mode: Boss Rush (2x 🪙)'
+          : '🌊 Mode: Standard';
     }
   
     renderSkinsModal() {
@@ -3359,6 +3771,9 @@
         } else if (engine.gameState === 'PAUSED') {
           engine.resumeGame();
         }
+      },
+      onTriggerUltimate: () => {
+        engine.activateUltimate();
       },
     });
   

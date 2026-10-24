@@ -30,8 +30,8 @@ Then open `http://localhost:8080` in any modern desktop or mobile browser.
 
 ### Controls
 
-- **Mouse / Touch**: Click/touch and drag horizontally to move the cannon and auto-fire.
-- **Keyboard**: Use `◀` / `▶` (`ArrowLeft` / `ArrowRight`) to move and hold `Space` to fire.
+- **Mouse / Touch**: Click/touch and drag horizontally to move the cannon and auto-fire. Tap the **☄️ READY!** button (bottom-right) when charged to unleash your **Orbital Supernova** ultimate.
+- **Keyboard**: Use `◀` / `▶` (`ArrowLeft` / `ArrowRight`) to move, hold `Space` to fire, press `E` or `Shift` to trigger **Orbital Supernova**, and press `P` or `Esc` to pause.
 
 ---
 
@@ -235,10 +235,15 @@ Because the project uses native ES modules with relative paths (`./src/main.js`)
   - [x] Pub/Sub `EventBus` and `ObjectPool` for zero-GC-spike performance
   - [x] GitHub Pages CI workflow (`.github/workflows/deploy.yml`) & Mobile Web App (`manifest.webmanifest`, `.nojekyll`)
   - [x] Automated unit test suite (`node --test`)
-- [x] **Core Cannon & Physics Engine**
+- [x] **Core Cannon, Wingman Drones & Ultimate Skill**
   - [x] Smooth horizontal cannon movement with rotating wheels, recoil, and muzzle flash
   - [x] Gravity, wall bouncing, and size-based floor bounce arcs for rocks
   - [x] Multi-barrel volley firing (unlocks 2, 3, and 4 barrels at higher Fire Rate levels)
+  - [x] **Wingman Helper Drones** (auto-unlock at Wave 5 / Fire Power Lv. 5 and Wave 12 / Fire Power Lv. 10) firing homing plasma spheres at the nearest boulder
+  - [x] **Orbital Supernova Ultimate (`☄️`)** rechargeable ability (`E` / `Shift` / on-screen button) that blasts all boulders on screen, shatters armor, and grants temporary invulnerability
+  - [x] **Combo Streak Multiplier & Critical Hits (`💥 CRIT!`)** up to 2.5x score multiplier
+  - [x] **Boss Rush Mode (`👑 2x 🪙`)** unlocked at Wave 6 for back-to-back Boss & Titan waves
+  - [x] In-game **Pause Modal (`⏸️`)** and automatic between-wave upgrade breather
 - [x] **Rocks, Special Variants & Wave Progression**
   - [x] Faceted polygon boulders with dynamic HP color tiers
   - [x] Rock splitting mechanics (Large → 2 Medium → 4 Small)

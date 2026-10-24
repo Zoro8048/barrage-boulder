@@ -4,6 +4,8 @@ import {
   getUpgradeCost,
   getFireRateShotsPerSec,
   getBarrelCount,
+  getDroneCount,
+  getComboMultiplier,
   getBulletDamage,
   getCoinMultiplier,
   calculateOfflineEarnings,
@@ -51,4 +53,20 @@ test('UpgradeMath - calculateOfflineEarnings respects 60s minimum and 8h cap', (
   assert.equal(calculateOfflineEarnings(60, 1), 6);
   // 10 hours away should cap at 480 minutes (8 hours)
   assert.equal(calculateOfflineEarnings(600 * 60, 1), 480 * 6);
+});
+
+test('UpgradeMath - getDroneCount unlocks 1 drone at Wave 5/FP 5 and 2 drones at Wave 12/FP 10', () => {
+  assert.equal(getDroneCount(1, 1), 0);
+  assert.equal(getDroneCount(5, 1), 1);
+  assert.equal(getDroneCount(2, 5), 1);
+  assert.equal(getDroneCount(12, 1), 2);
+  assert.equal(getDroneCount(4, 10), 2);
+});
+
+test('UpgradeMath - getComboMultiplier scales at 5, 10, 25, and 50 hit streaks', () => {
+  assert.equal(getComboMultiplier(0), 1.0);
+  assert.equal(getComboMultiplier(5), 1.2);
+  assert.equal(getComboMultiplier(10), 1.5);
+  assert.equal(getComboMultiplier(25), 2.0);
+  assert.equal(getComboMultiplier(50), 2.5);
 });

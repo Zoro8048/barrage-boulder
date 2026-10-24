@@ -22,6 +22,7 @@ export class AudioService {
     this.bus.on('sfx:shoot', ({ overdrive } = {}) => this.playShoot(overdrive));
     this.bus.on('sfx:hit', ({ hpRatio, armored } = {}) => this.playHit(hpRatio, armored));
     this.bus.on('sfx:coin', () => this.playCoin());
+    this.bus.on('sfx:ultimate', () => this.playUltimate());
     this.bus.on('rock:destroyed', ({ size } = {}) => this.playSplit(size));
     this.bus.on('powerup:collected', () => this.playPowerup());
     this.bus.on('achievement:unlocked', () => this.playPowerup());
@@ -227,6 +228,24 @@ export class AudioService {
       osc.start(t + i * 0.18);
       osc.stop(t + i * 0.18 + 0.24);
     });
+  }
+
+  playUltimate() {
+    if (this.sfxVolume <= 0.01 || !this.ctx) return;
+    const t = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(880, t);
+    osc.frequency.exponentialRampToValueAtTime(95, t + 0.55);
+
+    gain.gain.setValueAtTime(0.18 * this.sfxVolume, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.58);
+
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+    osc.start(t);
+    osc.stop(t + 0.6);
   }
 
   playGameOver() {

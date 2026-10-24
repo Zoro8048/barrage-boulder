@@ -17,6 +17,9 @@ export class HudController {
     this.coinPillEl = document.getElementById('coin-pill');
     this.currentScoreEl = document.getElementById('current-score');
     this.bestScoreEl = document.getElementById('best-score');
+    this.comboPillEl = document.getElementById('combo-pill');
+    this.ultBtnEl = document.getElementById('ult-btn');
+    this.ultPctEl = document.getElementById('ult-pct');
     this.waveCurrentEl = document.getElementById('wave-current');
     this.waveNextEl = document.getElementById('wave-next');
     this.waveBarFillEl = document.getElementById('wave-bar-fill');
@@ -70,6 +73,25 @@ export class HudController {
       this.updatePowerupHUD(activePowerups);
     });
 
+    this.bus.on('combo:updated', ({ count, multiplier }) => {
+      if (!this.comboPillEl) return;
+      if (count >= 5) {
+        this.comboPillEl.textContent = `🔥 ${count}x COMBO (${multiplier}x)`;
+        this.comboPillEl.classList.remove('hidden');
+      } else {
+        this.comboPillEl.classList.add('hidden');
+      }
+    });
+
+    this.bus.on('ultimate:updated', (charge) => {
+      this.updateUltimateHUD(charge);
+    });
+
+    this.ultBtnEl?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.engine.activateUltimate();
+    });
+
     this.bus.on('boss:tick', ({ boss, isPlaying }) => {
       this.updateBossHUD(boss, isPlaying);
     });
@@ -82,21 +104,26 @@ export class HudController {
       this.startPromptEl.classList.add('hidden');
       this.upgradePanelEl.classList.add('hidden');
       this.pauseBtn?.classList.remove('hidden');
+      this.ultBtnEl?.classList.remove('hidden');
     });
 
     this.bus.on('run:resumed', () => {
       this.pauseBtn?.classList.remove('hidden');
+      this.ultBtnEl?.classList.remove('hidden');
     });
 
     this.bus.on('run:gameover', () => {
       this.pauseBtn?.classList.add('hidden');
+      this.ultBtnEl?.classList.add('hidden');
     });
 
     this.bus.on('run:lobby', () => {
       this.updateHUD();
       this.pauseBtn?.classList.add('hidden');
+      this.ultBtnEl?.classList.add('hidden');
       if (this.startPromptTextEl) {
-        this.startPromptTextEl.textContent = `DRAG OR USE ◀ ▶ & SPACE — WAVE ${this.engine.saveManager.state.wave}`;
+        const modePrefix = this.engine.gameMode === 'BOSS_RUSH' ? '👑 BOSS RUSH — ' : '';
+        this.startPromptTextEl.textContent = `${modePrefix}DRAG OR USE ◀ ▶ & SPACE — WAVE ${this.engine.saveManager.state.wave}`;
       }
       this.startPromptEl.classList.remove('hidden');
       this.upgradePanelEl.classList.remove('hidden');
@@ -148,6 +175,14 @@ export class HudController {
         </div>`;
       })
       .join('');
+  }
+
+  updateUltimateHUD(charge = 0) {
+    if (!this.ultBtnEl || !this.ultPctEl) return;
+    const pct = Math.floor(charge);
+    const isReady = pct >= 100;
+    this.ultPctEl.textContent = isReady ? 'READY!' : `${pct}%`;
+    this.ultBtnEl.classList.toggle('ready', isReady);
   }
 
   showWaveBanner(title, sub, isBossAlert = false) {

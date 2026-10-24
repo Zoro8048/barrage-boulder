@@ -99,12 +99,17 @@ export class CanvasRenderer {
     // Bullets
     this.drawBullets(engine.bullets, skin);
 
+    // Orbital Ultimate Beam
+    if (engine.ultimateBeamTimer > 0) {
+      this.drawUltimateBeam(engine);
+    }
+
     // Rocks
     for (const r of engine.rocks) {
       this.drawRock(r, engine.activePowerups.freeze > 0);
     }
 
-    // Cannon
+    // Cannon & Wingman Drones
     this.drawCannon(skin);
 
     // Ground
@@ -234,6 +239,18 @@ export class CanvasRenderer {
     const { ctx } = this;
     for (const b of bullets) {
       ctx.save();
+      if (b.isDrone) {
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
+        ctx.fillStyle = '#00d2d3';
+        ctx.fill();
+        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = '#ffffff';
+        ctx.stroke();
+        ctx.restore();
+        continue;
+      }
+
       const grad = ctx.createLinearGradient(b.x, b.y - 10, b.x, b.y + 10);
       if (b.overdrive) {
         grad.addColorStop(0, '#ffffff');
@@ -250,6 +267,28 @@ export class CanvasRenderer {
       ctx.fill();
       ctx.restore();
     }
+  }
+
+  drawUltimateBeam(engine) {
+    const { ctx } = this;
+    const { cannon, ultimateBeamTimer } = engine;
+    const alpha = Math.min(1, ultimateBeamTimer * 1.4);
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+
+    // Wide outer plasma pillar
+    const beamGrad = ctx.createLinearGradient(cannon.x - 45, 0, cannon.x + 45, 0);
+    beamGrad.addColorStop(0, 'rgba(72, 219, 251, 0)');
+    beamGrad.addColorStop(0.25, 'rgba(72, 219, 251, 0.55)');
+    beamGrad.addColorStop(0.5, 'rgba(255, 255, 255, 0.95)');
+    beamGrad.addColorStop(0.75, 'rgba(72, 219, 251, 0.55)');
+    beamGrad.addColorStop(1, 'rgba(72, 219, 251, 0)');
+
+    ctx.fillStyle = beamGrad;
+    ctx.fillRect(cannon.x - 45, 0, 90, cannon.y - 36);
+
+    ctx.restore();
   }
 
   drawRock(r, isFrozen) {
@@ -416,6 +455,45 @@ export class CanvasRenderer {
 
     this.drawWheel(-17, -11, 11, cannon.wheelAngle, skin.wheelRim);
     this.drawWheel(17, -11, 11, cannon.wheelAngle, skin.wheelRim);
+
+    // Wingman Helper Drones
+    const droneCount = engine.getDroneCount();
+    if (droneCount > 0) {
+      const bobY = Math.sin(cannon.droneBobPhase) * 4;
+      this.drawDrone(-44, -34 + bobY, skin);
+      if (droneCount >= 2) {
+        this.drawDrone(44, -34 - bobY, skin);
+      }
+    }
+
+    ctx.restore();
+  }
+
+  drawDrone(dx, dy, skin) {
+    const { ctx } = this;
+    ctx.save();
+    ctx.translate(dx, dy);
+
+    // Thruster flame
+    ctx.fillStyle = 'rgba(72, 219, 251, 0.75)';
+    ctx.beginPath();
+    ctx.arc(0, 9, 4, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Drone body pod
+    ctx.fillStyle = skin.bodyTop;
+    ctx.beginPath();
+    ctx.roundRect(-9, -7, 18, 14, 5);
+    ctx.fill();
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = skin.rim;
+    ctx.stroke();
+
+    // Eye core
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(0, 0, 3, 0, Math.PI * 2);
+    ctx.fill();
 
     ctx.restore();
   }

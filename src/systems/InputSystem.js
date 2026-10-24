@@ -73,6 +73,11 @@ export class InputSystem {
         this.callbacks.onTogglePause?.();
         return;
       }
+      if (e.code === 'KeyE' || e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
+        e.preventDefault();
+        this.callbacks.onTriggerUltimate?.();
+        return;
+      }
       if (e.code === 'ArrowLeft' || e.code === 'ArrowRight' || e.code === 'Space') {
         e.preventDefault();
       }

@@ -36,3 +36,12 @@ test('WaveSystem - schedules standard boss every 3 waves and milestone boss ever
   assert.equal(wave10Last.variant, 'milestoneBoss');
   assert.equal(milestoneAlertFired, true);
 });
+
+test('WaveSystem - Boss Rush mode spawns all boss boulders', () => {
+  const bus = new EventBus();
+  const waveSystem = new WaveSystem(bus);
+
+  waveSystem.setupWave(4, false, Math.random, true);
+  assert.ok(waveSystem.waveRocksToSpawn.length >= 2);
+  assert.ok(waveSystem.waveRocksToSpawn.every((r) => r.isBoss === true));
+});

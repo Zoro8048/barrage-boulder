@@ -2,7 +2,7 @@
  * GameEngine - Central Simulation Coordinator
  */
 
-import { PHYSICS } from '../config/constants.js';
+import { PHYSICS, COMBAT } from '../config/constants.js';
 import { POWERUP_META, POWERUP_DROP_CHANCE } from '../config/powerups.js';
 import { ObjectPool } from './ObjectPool.js';
 import { formatNum } from './utils.js';
@@ -10,6 +10,7 @@ import {
   getUpgradeCost,
   getFireRateShotsPerSec,
   getBarrelCount,
+  getDroneCount,
   getBulletDamage,
   getCoinMultiplier,
 } from '../state/UpgradeMath.js';
@@ -29,6 +30,7 @@ export class GameEngine {
     this.groundY = 600;
 
     this.gameState = 'LOBBY';
+    this.gameMode = 'STANDARD'; // 'STANDARD' | 'BOSS_RUSH'
     this.score = 0;
     this.runCoins = 0;
     this.usedRevive = false;
@@ -36,6 +38,12 @@ export class GameEngine {
     this.intermissionLockTimer = 0;
     this.shakeTimer = 0;
     this.shakeIntensity = 0;
+
+    // Combo & Ultimate Skill State
+    this.comboCount = 0;
+    this.comboTimer = 0;
+    this.ultimateCharge = 0;
+    this.ultimateBeamTimer = 0;
 
     this.activePowerups = {
       rapidFire: 0,
@@ -66,6 +74,8 @@ export class GameEngine {
       vy: 0,
       radius: 5.5,
       overdrive: false,
+      isDrone: false,
+      damageRatio: 1.0,
     }));
 
     this.particlePool = new ObjectPool(() => ({
@@ -93,7 +103,9 @@ export class GameEngine {
   setViewport(width, height) {
     this.width = width;
     this.height = height;
-    this.groundY = height - PHYSICS.GROUND_HEIGHT;
+    const groundH =
+      this.gameState === 'LOBBY' ? PHYSICS.LOBBY_GROUND_HEIGHT : PHYSICS.GROUND_HEIGHT;
+    this.groundY = height - groundH;
     this.cannon.setBounds(width, this.groundY);
   }
 
@@ -109,6 +121,11 @@ export class GameEngine {
     return getBarrelCount(this.saveManager.state.upgrades.fireRate);
   }
 
+  getDroneCount() {
+    const save = this.saveManager.state;
+    return getDroneCount(save.stats.highestWave, save.upgrades.firePower);
+  }
+
   getBulletDamage() {
     return getBulletDamage(this.saveManager.state.upgrades.firePower);
   }
@@ -116,8 +133,33 @@ export class GameEngine {
   getCoinMultiplier() {
     return getCoinMultiplier(
       this.saveManager.state.upgrades.coinValue,
-      this.activePowerups.magnet > 0
+      this.activePowerups.magnet > 0,
+      this.gameMode === 'BOSS_RUSH'
     );
+  }
+
+  isBossRushUnlocked() {
+    return this.saveManager.state.stats.highestWave >= 6;
+  }
+
+  toggleGameMode() {
+    if (!this.isBossRushUnlocked()) return false;
+    this.gameMode = this.gameMode === 'STANDARD' ? 'BOSS_RUSH' : 'STANDARD';
+    this.setupCurrentWave();
+    this.bus.emit('mode:changed', this.gameMode);
+    return true;
+  }
+
+  addUltimateCharge(amount) {
+    const prev = this.ultimateCharge;
+    this.ultimateCharge = Math.min(100, this.ultimateCharge + amount);
+    if (this.ultimateCharge !== prev) {
+      this.bus.emit('ultimate:updated', this.ultimateCharge);
+    }
+  }
+
+  activateUltimate() {
+    return this.combatSystem.triggerUltimate(this);
   }
 
   // --- VFX & Drop Spawners ---
@@ -255,7 +297,12 @@ export class GameEngine {
       save.stats.highestWave = save.wave;
       this.saveManager.persist();
     }
-    this.waveSystem.setupWave(save.wave, this.gameState === 'PLAYING');
+    this.waveSystem.setupWave(
+      save.wave,
+      this.gameState === 'PLAYING',
+      Math.random,
+      this.gameMode === 'BOSS_RUSH'
+    );
   }
 
   startRun() {
@@ -265,6 +312,7 @@ export class GameEngine {
     this.saveManager.persist();
     this.setupCurrentWave();
     this.bus.emit('run:started');
+    this.bus.emit('ultimate:updated', this.ultimateCharge);
   }
 
   pauseGame() {
@@ -329,6 +377,9 @@ export class GameEngine {
   triggerGameOver() {
     if (this.gameState === 'GAMEOVER') return;
     this.gameState = 'GAMEOVER';
+    this.comboCount = 0;
+    this.comboTimer = 0;
+    this.bus.emit('combo:updated', { count: 0, multiplier: 1 });
     this.triggerShake(14, 0.35);
     this.addParticles(this.cannon.x, this.cannon.y - 18, '#38b6ff', 28, 280);
 
@@ -362,6 +413,10 @@ export class GameEngine {
     this.score = 0;
     this.runCoins = 0;
     this.usedRevive = false;
+    this.comboCount = 0;
+    this.comboTimer = 0;
+    this.ultimateCharge = 0;
+    this.ultimateBeamTimer = 0;
     Object.keys(this.activePowerups).forEach((k) => (this.activePowerups[k] = 0));
 
     this.bullets.forEach((b) => this.bulletPool.release(b));
@@ -377,6 +432,8 @@ export class GameEngine {
 
     this.setupCurrentWave();
     this.bus.emit('run:lobby');
+    this.bus.emit('combo:updated', { count: 0, multiplier: 1 });
+    this.bus.emit('ultimate:updated', this.ultimateCharge);
     this.bus.emit('powerup:updated', this.activePowerups);
   }
 
@@ -391,7 +448,10 @@ export class GameEngine {
       this.intermissionLockTimer = Math.max(0, this.intermissionLockTimer - dt);
     }
 
-    // Freeze simulation while paused or while a modal dialog is open
+    if (this.ultimateBeamTimer > 0) {
+      this.ultimateBeamTimer = Math.max(0, this.ultimateBeamTimer - dt);
+    }
+
     if (this.gameState === 'PAUSED' || isModalOpen) {
       return;
     }
@@ -400,8 +460,8 @@ export class GameEngine {
       this.invulnerableTimer -= dt;
     }
 
-    // Tick active power-up durations only during active combat
     if (this.gameState === 'PLAYING') {
+      // Tick active power-up durations
       let powerupChanged = false;
       for (const key of Object.keys(this.activePowerups)) {
         if (this.activePowerups[key] > 0) {
@@ -412,7 +472,26 @@ export class GameEngine {
       if (powerupChanged) {
         this.bus.emit('powerup:updated', this.activePowerups);
       }
+
+      // Tick Combo decay timer
+      if (this.comboTimer > 0) {
+        this.comboTimer -= dt;
+        if (this.comboTimer <= 0) {
+          this.comboCount = 0;
+          this.bus.emit('combo:updated', { count: 0, multiplier: 1 });
+        }
+      }
     }
+
+    const targetGroundH =
+      this.gameState === 'LOBBY' ? PHYSICS.LOBBY_GROUND_HEIGHT : PHYSICS.GROUND_HEIGHT;
+    const targetGroundY = this.height - targetGroundH;
+    if (Math.abs(this.groundY - targetGroundY) > 0.5) {
+      this.groundY += (targetGroundY - this.groundY) * Math.min(1, dt * 12);
+    } else {
+      this.groundY = targetGroundY;
+    }
+    this.cannon.y = this.groundY;
 
     const keyDir = this.gameState !== 'GAMEOVER' ? inputSystem.getKeyMoveDirection() : 0;
     this.cannon.update(dt, this.width, keyDir);
@@ -422,6 +501,11 @@ export class GameEngine {
       if (this.cannon.shootCooldown <= 0) {
         this.cannon.shootCooldown = fireInterval;
         this.combatSystem.fireVolley(this);
+      }
+
+      if (this.cannon.droneCooldown <= 0 && this.getDroneCount() > 0) {
+        this.cannon.droneCooldown = COMBAT.DRONE_FIRE_INTERVAL;
+        this.combatSystem.fireDrones(this);
       }
     }
 
