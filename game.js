@@ -17,7 +17,7 @@
     POWERUP_GRAVITY: 320,
     PARTICLE_GRAVITY: 260,
     GROUND_HEIGHT: 96,
-    LOBBY_GROUND_HEIGHT: 220,
+    LOBBY_GROUND_HEIGHT: 165,
     KEY_MOVE_SPEED: 420,
     CANNON_TRACK_SMOOTHING: 22,
     CANNON_RADIUS: 26,
@@ -484,62 +484,78 @@
 
   // --- Module: src/config/powerups.js ---
   /**
-   * Power-up Drops Metadata & Durations (8 Power-Up Types)
+   * Power-up Drops Metadata, Short Orb Tags, HUD Descriptions & Durations (8 Power-Up Types)
    */
   const POWERUP_META = {
     rapidFire: {
       id: 'rapidFire',
       icon: '⚡',
+      shortTag: '2x SPEED',
       label: 'OVERDRIVE',
+      hudDesc: '1.85x Fire Speed',
       color: '#48dbfb',
       duration: 8,
     },
     spreadShot: {
       id: 'spreadShot',
       icon: '🔱',
+      shortTag: 'SPREAD',
       label: 'SPREAD FAN',
+      hudDesc: '+2 Wide Wing Streams',
       color: '#ff9f1a',
       duration: 8.5,
     },
     explosiveRounds: {
       id: 'explosiveRounds',
       icon: '💣',
+      shortTag: 'SPLASH',
       label: 'BLAST SHELLS',
+      hudDesc: '50% Area Splash DMG',
       color: '#ff4757',
       duration: 8,
     },
     piercingLaser: {
       id: 'piercingLaser',
       icon: '🔦',
+      shortTag: 'PIERCE',
       label: 'PIERCE BEAM',
+      hudDesc: 'Shots Pass Thru Rocks',
       color: '#d980fa',
       duration: 7.5,
     },
     giantBullets: {
       id: 'giantBullets',
       icon: '🔥',
+      shortTag: '2x DMG',
       label: 'MEGA CALIBRE',
+      hudDesc: '2x DMG & Knockback',
       color: '#ffa502',
       duration: 8,
     },
     shield: {
       id: 'shield',
       icon: '🛡️',
+      shortTag: 'SHIELD',
       label: 'FORCE SHIELD',
+      hudDesc: 'Repels Rock Hits',
       color: '#2ed573',
       duration: 8.5,
     },
     magnet: {
       id: 'magnet',
       icon: '🧲',
+      shortTag: '2x COINS',
       label: 'MAGNET 2X',
+      hudDesc: '1.5x Coins + Vacuum',
       color: '#ffcf33',
       duration: 10,
     },
     freeze: {
       id: 'freeze',
       icon: '❄️',
+      shortTag: 'SLOW',
       label: 'CRYO SLOW',
+      hudDesc: 'Slows Rocks by 55%',
       color: '#7ed6df',
       duration: 7.5,
     },
@@ -2243,7 +2259,9 @@
       this.width = width;
       this.height = height;
       const groundH =
-        this.gameState === 'LOBBY' ? PHYSICS.LOBBY_GROUND_HEIGHT : PHYSICS.GROUND_HEIGHT;
+        this.gameState === 'LOBBY'
+          ? PHYSICS.LOBBY_GROUND_HEIGHT || PHYSICS.GROUND_HEIGHT
+          : PHYSICS.GROUND_HEIGHT;
       this.groundY = height - groundH;
       this.cannon.setBounds(width, this.groundY);
     }
@@ -2298,6 +2316,9 @@
       this.ultimateCharge = Math.min(100, this.ultimateCharge + amount);
       if (this.ultimateCharge !== prev) {
         this.bus.emit('ultimate:updated', this.ultimateCharge);
+      }
+      if (this.ultimateCharge >= 100 && this.gameState === 'PLAYING' && this.rocks.length > 0) {
+        this.activateUltimate();
       }
     }
   
@@ -2380,7 +2401,13 @@
       this.saveManager.state.stats.powerupsCollected += 1;
       this.bus.emit('powerup:collected', { type, meta });
       this.addParticles(x, y, meta.color, 18, 220);
-      this.addFloatingText(x, y - 16, `${meta.icon} ${meta.label}!`, meta.color, 16);
+      this.addFloatingText(
+        x,
+        y - 18,
+        `${meta.icon} ${meta.label}: ${meta.hudDesc}!`,
+        meta.color,
+        14
+      );
       this.achievementTracker.checkUnlockables();
       this.saveManager.persist();
       this.bus.emit('powerup:updated', this.activePowerups);
@@ -2630,9 +2657,13 @@
       }
   
       const targetGroundH =
-        this.gameState === 'LOBBY' ? PHYSICS.LOBBY_GROUND_HEIGHT : PHYSICS.GROUND_HEIGHT;
+        this.gameState === 'LOBBY'
+          ? PHYSICS.LOBBY_GROUND_HEIGHT || PHYSICS.GROUND_HEIGHT
+          : PHYSICS.GROUND_HEIGHT;
       const targetGroundY = this.height - targetGroundH;
-      if (Math.abs(this.groundY - targetGroundY) > 0.5) {
+      if (!Number.isFinite(this.groundY)) {
+        this.groundY = targetGroundY;
+      } else if (Math.abs(this.groundY - targetGroundY) > 0.5) {
         this.groundY += (targetGroundY - this.groundY) * Math.min(1, dt * 12);
       } else {
         this.groundY = targetGroundY;
@@ -2891,11 +2922,13 @@
         ctx.save();
         ctx.translate(p.x, p.y + Math.sin(p.bobPhase) * 3);
   
+        // Outer pulse ring
         ctx.beginPath();
-        ctx.arc(0, 0, p.radius + 4, 0, Math.PI * 2);
+        ctx.arc(0, 0, p.radius + 5, 0, Math.PI * 2);
         ctx.fillStyle = `${meta.color}33`;
         ctx.fill();
   
+        // Core orb
         ctx.beginPath();
         ctx.arc(0, 0, p.radius, 0, Math.PI * 2);
         ctx.fillStyle = '#141b33';
@@ -2904,10 +2937,28 @@
         ctx.strokeStyle = meta.color;
         ctx.stroke();
   
+        // Icon
         ctx.font = '15px sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(meta.icon, 0, 1);
+  
+        // Readable Short Tag Badge below orb so player knows what power-up is falling
+        if (meta.shortTag) {
+          ctx.font = '900 9px -apple-system, BlinkMacSystemFont, sans-serif';
+          const tagW = ctx.measureText(meta.shortTag).width + 8;
+          ctx.fillStyle = 'rgba(10, 14, 28, 0.88)';
+          ctx.beginPath();
+          ctx.roundRect(-tagW / 2, p.radius + 3, tagW, 13, 4);
+          ctx.fill();
+          ctx.strokeStyle = meta.color;
+          ctx.lineWidth = 1;
+          ctx.stroke();
+  
+          ctx.fillStyle = meta.color;
+          ctx.fillText(meta.shortTag, 0, p.radius + 9.5);
+        }
+  
         ctx.restore();
       }
     }
@@ -3660,8 +3711,6 @@
       this.currentScoreEl = document.getElementById('current-score');
       this.bestScoreEl = document.getElementById('best-score');
       this.comboPillEl = document.getElementById('combo-pill');
-      this.ultBtnEl = document.getElementById('ult-btn');
-      this.ultPctEl = document.getElementById('ult-pct');
       this.waveCurrentEl = document.getElementById('wave-current');
       this.waveNextEl = document.getElementById('wave-next');
       this.waveBarFillEl = document.getElementById('wave-bar-fill');
@@ -3673,7 +3722,9 @@
       this.achToastIconEl = document.getElementById('ach-toast-icon');
       this.achToastTitleEl = document.getElementById('ach-toast-title');
       this.startPromptEl = document.getElementById('start-prompt');
+      this.startPromptWaveEl = document.getElementById('start-prompt-wave');
       this.startPromptTextEl = document.getElementById('start-prompt-text');
+      this.lobbyModeWrapEl = document.getElementById('lobby-mode-wrap');
       this.upgradePanelEl = document.getElementById('upgrade-panel');
       this.pauseBtn = document.getElementById('pause-btn');
       this.waveBannerEl = document.getElementById('wave-banner');
@@ -3703,6 +3754,10 @@
         this.showWaveBanner(`⚠️ MILESTONE WAVE ${waveNum}`, 'MEGA TITAN BOSS INCOMING!', true);
       });
   
+      this.bus.on('ui:banner', ({ title, sub, isAlert }) => {
+        this.showWaveBanner(title, sub, Boolean(isAlert));
+      });
+  
       this.bus.on('wave:cleared', ({ clearedWave, isMilestone, waveBonus }) => {
         this.showWaveBanner(
           isMilestone ? `🏆 MILESTONE ${clearedWave} CONQUERED!` : `WAVE ${clearedWave} CLEARED!`,
@@ -3725,15 +3780,6 @@
         }
       });
   
-      this.bus.on('ultimate:updated', (charge) => {
-        this.updateUltimateHUD(charge);
-      });
-  
-      this.ultBtnEl?.addEventListener('click', (e) => {
-        e.stopPropagation();
-        this.engine.activateUltimate();
-      });
-  
       this.bus.on('boss:tick', ({ boss, isPlaying }) => {
         this.updateBossHUD(boss, isPlaying);
       });
@@ -3744,30 +3790,25 @@
   
       this.bus.on('run:started', () => {
         this.startPromptEl.classList.add('hidden');
+        this.lobbyModeWrapEl?.classList.add('hidden');
         this.upgradePanelEl.classList.add('hidden');
         this.pauseBtn?.classList.remove('hidden');
-        this.ultBtnEl?.classList.remove('hidden');
       });
   
       this.bus.on('run:resumed', () => {
         this.pauseBtn?.classList.remove('hidden');
-        this.ultBtnEl?.classList.remove('hidden');
       });
   
       this.bus.on('run:gameover', () => {
         this.pauseBtn?.classList.add('hidden');
-        this.ultBtnEl?.classList.add('hidden');
+        this.lobbyModeWrapEl?.classList.add('hidden');
       });
   
       this.bus.on('run:lobby', () => {
         this.updateHUD();
         this.pauseBtn?.classList.add('hidden');
-        this.ultBtnEl?.classList.add('hidden');
-        if (this.startPromptTextEl) {
-          const modePrefix = this.engine.gameMode === 'BOSS_RUSH' ? '👑 BOSS RUSH — ' : '';
-          this.startPromptTextEl.textContent = `${modePrefix}DRAG OR USE ◀ ▶ & SPACE — WAVE ${this.engine.saveManager.state.wave}`;
-        }
         this.startPromptEl.classList.remove('hidden');
+        this.lobbyModeWrapEl?.classList.remove('hidden');
         this.upgradePanelEl.classList.remove('hidden');
       });
     }
@@ -3777,6 +3818,17 @@
       this.coinCountEl.textContent = formatNum(save.coins);
       this.currentScoreEl.textContent = formatNum(this.engine.score);
       this.bestScoreEl.textContent = `BEST: ${formatNum(save.bestScore)}`;
+  
+      if (this.startPromptWaveEl) {
+        const isBossRush = this.engine.gameMode === 'BOSS_RUSH';
+        this.startPromptWaveEl.textContent = isBossRush
+          ? `👑 BOSS RUSH • WAVE ${save.wave}`
+          : `WAVE ${save.wave}`;
+        this.startPromptWaveEl.classList.toggle('boss-rush', isBossRush);
+      }
+      if (this.startPromptTextEl) {
+        this.startPromptTextEl.textContent = 'DRAG TO AIM & FIRE';
+      }
     }
   
     updateWaveHUD(waveNum, damageDealt, totalHP) {
@@ -3813,18 +3865,11 @@
           return `<div class="powerup-pill" style="border-color:${meta.color}">
             <span>${meta.icon}</span>
             <span>${meta.label}</span>
-            <span>${remaining.toFixed(1)}s</span>
+            <span class="powerup-pill-desc">(${meta.hudDesc})</span>
+            <span class="powerup-pill-time">${remaining.toFixed(1)}s</span>
           </div>`;
         })
         .join('');
-    }
-  
-    updateUltimateHUD(charge = 0) {
-      if (!this.ultBtnEl || !this.ultPctEl) return;
-      const pct = Math.floor(charge);
-      const isReady = pct >= 100;
-      this.ultPctEl.textContent = isReady ? 'READY!' : `${pct}%`;
-      this.ultBtnEl.classList.toggle('ready', isReady);
     }
   
     showWaveBanner(title, sub, isBossAlert = false) {
@@ -3990,17 +4035,34 @@
       };
   
       this.skinsBtn.addEventListener('click', openSkins);
-      this.openSkinsFooterBtn.addEventListener('click', openSkins);
+      this.openSkinsFooterBtn?.addEventListener('click', openSkins);
       this.statsBtn.addEventListener('click', openStats);
-      this.openStatsFooterBtn.addEventListener('click', openStats);
+      this.openStatsFooterBtn?.addEventListener('click', openStats);
       this.settingsBtn.addEventListener('click', openSettings);
       this.openDisclaimerBtn?.addEventListener('click', openDisclaimer);
       this.openDisclaimerSettingsBtn?.addEventListener('click', openDisclaimer);
   
+      // Hangar modal tab switching
+      document.querySelectorAll('#hangar-tabs .hangar-tab').forEach((tabBtn) => {
+        tabBtn.addEventListener('click', () => {
+          const targetTab = tabBtn.getAttribute('data-tab');
+          document.querySelectorAll('#hangar-tabs .hangar-tab').forEach((b) => {
+            b.classList.toggle('active', b === tabBtn);
+          });
+          document.querySelectorAll('#skins-modal .hangar-pane').forEach((pane) => {
+            pane.classList.toggle('hidden', pane.id !== `pane-${targetTab}`);
+          });
+        });
+      });
+  
       this.modeToggleBtn?.addEventListener('click', () => {
         this.audioService.init();
         if (!this.engine.isBossRushUnlocked()) {
-          alert('Reach Wave 6 to unlock Boss Rush Mode (2x Coin Multiplier)!');
+          this.bus.emit('ui:banner', {
+            title: '🔒 BOSS RUSH LOCKED',
+            sub: 'Reach Wave 6 to unlock 2x Coin Boss Rush!',
+            isAlert: true,
+          });
           return;
         }
         this.engine.toggleGameMode();
@@ -4060,12 +4122,30 @@
         this.engine.returnToLobby();
       });
   
+      this.resetConfirmTimeout = null;
       this.resetSaveBtn.addEventListener('click', () => {
-        if (confirm('Reset all coins, waves, upgrades, and achievements?')) {
-          this.engine.saveManager.reset();
-          this.syncSettingsUI();
-          this.engine.returnToLobby();
+        if (!this.resetSaveBtn.classList.contains('confirm-danger')) {
+          this.resetSaveBtn.classList.add('confirm-danger');
+          this.resetSaveBtn.textContent = '⚠️ Tap Again to Confirm Reset';
+          if (this.resetConfirmTimeout) clearTimeout(this.resetConfirmTimeout);
+          this.resetConfirmTimeout = setTimeout(() => {
+            this.resetSaveBtn.classList.remove('confirm-danger');
+            this.resetSaveBtn.textContent = '🗑️ Reset All Progress';
+          }, 3500);
+          return;
         }
+        if (this.resetConfirmTimeout) clearTimeout(this.resetConfirmTimeout);
+        this.resetSaveBtn.classList.remove('confirm-danger');
+        this.resetSaveBtn.textContent = '🗑️ Reset All Progress';
+        this.engine.saveManager.reset();
+        this.syncSettingsUI();
+        this.settingsModalEl?.classList.add('hidden');
+        this.engine.returnToLobby();
+        this.bus.emit('ui:banner', {
+          title: '🔄 PROGRESS RESET',
+          sub: 'All stats, coins & upgrades restored to Wave 1',
+          isAlert: false,
+        });
       });
     }
   
@@ -4244,6 +4324,27 @@
           this.renderSkinsModal();
         };
       });
+  
+      const powerupsGuideEl = document.getElementById('powerups-guide-list');
+      if (powerupsGuideEl) {
+        powerupsGuideEl.innerHTML = Object.values(POWERUP_META)
+          .map(
+            (meta) => `<div class="codex-card" style="border-color:${meta.color}66">
+              <div class="codex-orb" style="border-color:${meta.color}">${meta.icon}</div>
+              <div class="codex-body">
+                <div class="codex-header">
+                  <div class="codex-title-group">
+                    <span class="codex-name" style="color:${meta.color}">${meta.label}</span>
+                    <span class="codex-tag" style="border:1px solid ${meta.color}55">${meta.shortTag}</span>
+                  </div>
+                  <span class="codex-duration">${meta.duration}s</span>
+                </div>
+                <div class="codex-desc">${meta.hudDesc}</div>
+              </div>
+            </div>`
+          )
+          .join('');
+      }
     }
   
     renderStatsModal() {

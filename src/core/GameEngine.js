@@ -108,7 +108,9 @@ export class GameEngine {
     this.width = width;
     this.height = height;
     const groundH =
-      this.gameState === 'LOBBY' ? PHYSICS.LOBBY_GROUND_HEIGHT : PHYSICS.GROUND_HEIGHT;
+      this.gameState === 'LOBBY'
+        ? PHYSICS.LOBBY_GROUND_HEIGHT || PHYSICS.GROUND_HEIGHT
+        : PHYSICS.GROUND_HEIGHT;
     this.groundY = height - groundH;
     this.cannon.setBounds(width, this.groundY);
   }
@@ -163,6 +165,9 @@ export class GameEngine {
     this.ultimateCharge = Math.min(100, this.ultimateCharge + amount);
     if (this.ultimateCharge !== prev) {
       this.bus.emit('ultimate:updated', this.ultimateCharge);
+    }
+    if (this.ultimateCharge >= 100 && this.gameState === 'PLAYING' && this.rocks.length > 0) {
+      this.activateUltimate();
     }
   }
 
@@ -245,7 +250,13 @@ export class GameEngine {
     this.saveManager.state.stats.powerupsCollected += 1;
     this.bus.emit('powerup:collected', { type, meta });
     this.addParticles(x, y, meta.color, 18, 220);
-    this.addFloatingText(x, y - 16, `${meta.icon} ${meta.label}!`, meta.color, 16);
+    this.addFloatingText(
+      x,
+      y - 18,
+      `${meta.icon} ${meta.label}: ${meta.hudDesc}!`,
+      meta.color,
+      14
+    );
     this.achievementTracker.checkUnlockables();
     this.saveManager.persist();
     this.bus.emit('powerup:updated', this.activePowerups);
@@ -495,9 +506,13 @@ export class GameEngine {
     }
 
     const targetGroundH =
-      this.gameState === 'LOBBY' ? PHYSICS.LOBBY_GROUND_HEIGHT : PHYSICS.GROUND_HEIGHT;
+      this.gameState === 'LOBBY'
+        ? PHYSICS.LOBBY_GROUND_HEIGHT || PHYSICS.GROUND_HEIGHT
+        : PHYSICS.GROUND_HEIGHT;
     const targetGroundY = this.height - targetGroundH;
-    if (Math.abs(this.groundY - targetGroundY) > 0.5) {
+    if (!Number.isFinite(this.groundY)) {
+      this.groundY = targetGroundY;
+    } else if (Math.abs(this.groundY - targetGroundY) > 0.5) {
       this.groundY += (targetGroundY - this.groundY) * Math.min(1, dt * 12);
     } else {
       this.groundY = targetGroundY;

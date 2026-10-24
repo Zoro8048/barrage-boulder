@@ -214,11 +214,13 @@ export class CanvasRenderer {
       ctx.save();
       ctx.translate(p.x, p.y + Math.sin(p.bobPhase) * 3);
 
+      // Outer pulse ring
       ctx.beginPath();
-      ctx.arc(0, 0, p.radius + 4, 0, Math.PI * 2);
+      ctx.arc(0, 0, p.radius + 5, 0, Math.PI * 2);
       ctx.fillStyle = `${meta.color}33`;
       ctx.fill();
 
+      // Core orb
       ctx.beginPath();
       ctx.arc(0, 0, p.radius, 0, Math.PI * 2);
       ctx.fillStyle = '#141b33';
@@ -227,10 +229,28 @@ export class CanvasRenderer {
       ctx.strokeStyle = meta.color;
       ctx.stroke();
 
+      // Icon
       ctx.font = '15px sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(meta.icon, 0, 1);
+
+      // Readable Short Tag Badge below orb so player knows what power-up is falling
+      if (meta.shortTag) {
+        ctx.font = '900 9px -apple-system, BlinkMacSystemFont, sans-serif';
+        const tagW = ctx.measureText(meta.shortTag).width + 8;
+        ctx.fillStyle = 'rgba(10, 14, 28, 0.88)';
+        ctx.beginPath();
+        ctx.roundRect(-tagW / 2, p.radius + 3, tagW, 13, 4);
+        ctx.fill();
+        ctx.strokeStyle = meta.color;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        ctx.fillStyle = meta.color;
+        ctx.fillText(meta.shortTag, 0, p.radius + 9.5);
+      }
+
       ctx.restore();
     }
   }

@@ -8,6 +8,7 @@ import { CANNON_SKINS } from '../config/skins.js';
 import { ARENA_THEMES } from '../config/themes.js';
 import { CANNON_VARIETIES } from '../config/cannons.js';
 import { CANNON_ADDONS } from '../config/addons.js';
+import { POWERUP_META } from '../config/powerups.js';
 import { ACHIEVEMENTS } from '../config/achievements.js';
 import {
   getUpgradeCost,
@@ -153,17 +154,34 @@ export class ModalController {
     };
 
     this.skinsBtn.addEventListener('click', openSkins);
-    this.openSkinsFooterBtn.addEventListener('click', openSkins);
+    this.openSkinsFooterBtn?.addEventListener('click', openSkins);
     this.statsBtn.addEventListener('click', openStats);
-    this.openStatsFooterBtn.addEventListener('click', openStats);
+    this.openStatsFooterBtn?.addEventListener('click', openStats);
     this.settingsBtn.addEventListener('click', openSettings);
     this.openDisclaimerBtn?.addEventListener('click', openDisclaimer);
     this.openDisclaimerSettingsBtn?.addEventListener('click', openDisclaimer);
 
+    // Hangar modal tab switching
+    document.querySelectorAll('#hangar-tabs .hangar-tab').forEach((tabBtn) => {
+      tabBtn.addEventListener('click', () => {
+        const targetTab = tabBtn.getAttribute('data-tab');
+        document.querySelectorAll('#hangar-tabs .hangar-tab').forEach((b) => {
+          b.classList.toggle('active', b === tabBtn);
+        });
+        document.querySelectorAll('#skins-modal .hangar-pane').forEach((pane) => {
+          pane.classList.toggle('hidden', pane.id !== `pane-${targetTab}`);
+        });
+      });
+    });
+
     this.modeToggleBtn?.addEventListener('click', () => {
       this.audioService.init();
       if (!this.engine.isBossRushUnlocked()) {
-        alert('Reach Wave 6 to unlock Boss Rush Mode (2x Coin Multiplier)!');
+        this.bus.emit('ui:banner', {
+          title: '🔒 BOSS RUSH LOCKED',
+          sub: 'Reach Wave 6 to unlock 2x Coin Boss Rush!',
+          isAlert: true,
+        });
         return;
       }
       this.engine.toggleGameMode();
@@ -223,12 +241,30 @@ export class ModalController {
       this.engine.returnToLobby();
     });
 
+    this.resetConfirmTimeout = null;
     this.resetSaveBtn.addEventListener('click', () => {
-      if (confirm('Reset all coins, waves, upgrades, and achievements?')) {
-        this.engine.saveManager.reset();
-        this.syncSettingsUI();
-        this.engine.returnToLobby();
+      if (!this.resetSaveBtn.classList.contains('confirm-danger')) {
+        this.resetSaveBtn.classList.add('confirm-danger');
+        this.resetSaveBtn.textContent = '⚠️ Tap Again to Confirm Reset';
+        if (this.resetConfirmTimeout) clearTimeout(this.resetConfirmTimeout);
+        this.resetConfirmTimeout = setTimeout(() => {
+          this.resetSaveBtn.classList.remove('confirm-danger');
+          this.resetSaveBtn.textContent = '🗑️ Reset All Progress';
+        }, 3500);
+        return;
       }
+      if (this.resetConfirmTimeout) clearTimeout(this.resetConfirmTimeout);
+      this.resetSaveBtn.classList.remove('confirm-danger');
+      this.resetSaveBtn.textContent = '🗑️ Reset All Progress';
+      this.engine.saveManager.reset();
+      this.syncSettingsUI();
+      this.settingsModalEl?.classList.add('hidden');
+      this.engine.returnToLobby();
+      this.bus.emit('ui:banner', {
+        title: '🔄 PROGRESS RESET',
+        sub: 'All stats, coins & upgrades restored to Wave 1',
+        isAlert: false,
+      });
     });
   }
 
@@ -407,6 +443,27 @@ export class ModalController {
         this.renderSkinsModal();
       };
     });
+
+    const powerupsGuideEl = document.getElementById('powerups-guide-list');
+    if (powerupsGuideEl) {
+      powerupsGuideEl.innerHTML = Object.values(POWERUP_META)
+        .map(
+          (meta) => `<div class="codex-card" style="border-color:${meta.color}66">
+            <div class="codex-orb" style="border-color:${meta.color}">${meta.icon}</div>
+            <div class="codex-body">
+              <div class="codex-header">
+                <div class="codex-title-group">
+                  <span class="codex-name" style="color:${meta.color}">${meta.label}</span>
+                  <span class="codex-tag" style="border:1px solid ${meta.color}55">${meta.shortTag}</span>
+                </div>
+                <span class="codex-duration">${meta.duration}s</span>
+              </div>
+              <div class="codex-desc">${meta.hudDesc}</div>
+            </div>
+          </div>`
+        )
+        .join('');
+    }
   }
 
   renderStatsModal() {

@@ -36,13 +36,13 @@
             <button id="pause-btn" class="icon-btn hidden" title="Pause Game (P / Esc)" aria-label="Pause Game">
               ⏸️
             </button>
-            <button id="skins-btn" class="icon-btn" title="Skins &amp; Themes" aria-label="Skins and Themes">
+            <button id="skins-btn" class="icon-btn" title="Hangar, Loadout &amp; Power-Up Guide" aria-label="Hangar and Loadout">
               🎨
             </button>
             <button id="stats-btn" class="icon-btn" title="Stats &amp; Achievements" aria-label="Stats and Achievements">
               🏆
             </button>
-            <button id="settings-btn" class="icon-btn" title="Audio &amp; Settings" aria-label="Audio and Settings">
+            <button id="settings-btn" class="icon-btn" title="Settings &amp; Legal" aria-label="Settings">
               ⚙️
             </button>
           </div>
@@ -56,21 +56,20 @@
           </div>
         </div>
 
-        <!-- Active Power-up Pills -->
+        <!-- Active Power-up Pills (with effect description) -->
         <div id="powerup-hud" class="powerup-hud"></div>
 
         <div class="score-display">
           <div id="current-score">0</div>
           <div id="best-score">BEST: 0</div>
           <div id="combo-pill" class="combo-pill hidden">🔥 5x COMBO (1.2x)</div>
+          <div id="lobby-mode-wrap" class="lobby-mode-wrap">
+            <button type="button" id="mode-toggle-btn" class="mode-chip-btn">
+              🌊 Mode: Standard
+            </button>
+          </div>
         </div>
       </header>
-
-      <!-- Active Ultimate Ability Button (shown during gameplay) -->
-      <button type="button" id="ult-btn" class="ult-btn hidden" title="Orbital Supernova (E / Shift)">
-        <span class="ult-icon">☄️</span>
-        <span class="ult-pct" id="ult-pct">0%</span>
-      </button>
 
       <!-- Achievement Toast Notification -->
       <div id="achievement-toast" class="achievement-toast hidden">
@@ -83,12 +82,14 @@
 
       <!-- Drag to Start Prompt (shown in lobby before dragging) -->
       <div id="start-prompt" class="visible">
+        <div id="start-prompt-wave" class="start-wave-pill">WAVE 1</div>
         <div class="hand-slider">
           <span class="arrow">◀</span>
           <span class="hand-icon">👆</span>
           <span class="arrow">▶</span>
         </div>
-        <p id="start-prompt-text">DRAG OR USE ◀ ▶ &amp; SPACE</p>
+        <p id="start-prompt-text">DRAG TO AIM &amp; FIRE</p>
+        <span class="start-prompt-sub">or use ◀ ▶ &amp; Space</span>
       </div>
 
       <!-- Wave Clear / Boss Warning Banner -->
@@ -97,7 +98,7 @@
         <div class="wave-banner-sub" id="wave-banner-bonus">+50 🪙 BONUS</div>
       </div>
 
-      <!-- Bottom Upgrade Panel (visible between runs / before dragging) -->
+      <!-- Bottom Upgrade Panel (sits cleanly inside underground foundation below cannon) -->
       <section id="upgrade-panel" class="visible">
         <div class="upgrade-grid">
           <button class="upgrade-card" data-upgrade="fireRate" id="upg-fireRate">
@@ -153,15 +154,8 @@
           </button>
         </div>
 
-        <div class="panel-footer">
-          <button type="button" id="mode-toggle-btn" class="pill-footer-btn">🌊 Mode: Standard</button>
-          <button type="button" id="open-skins-footer-btn" class="pill-footer-btn">🎨 Hangar &amp; Themes</button>
-          <button type="button" id="open-stats-footer-btn" class="pill-footer-btn">🏆 Achievements</button>
-          <button type="button" id="reset-save-btn" class="text-btn">Reset Progress</button>
-        </div>
-
         <div class="legal-footer-bar">
-          <span>100% Free Non-Commercial Hobby Project • Zero Monetization</span>
+          <span>Free Non-Commercial Hobby Project • Zero Monetization</span>
           <button type="button" id="open-disclaimer-btn" class="disclaimer-link-btn">
             ℹ️ Legal Notice
           </button>
@@ -233,24 +227,66 @@
         </div>
       </div>
 
-      <!-- Skins, Cannon Varieties, Add-Ons & Themes Modal -->
+      <!-- Tabbed Hangar, Loadout & Codex Modal -->
       <div id="skins-modal" class="modal-backdrop hidden">
         <div class="modal-card wide-modal">
           <button class="modal-close-btn" data-close="skins-modal" aria-label="Close">✕</button>
-          <div class="modal-badge blue-badge">CUSTOMIZE LOADOUT</div>
-          <h2>HANGAR &amp; THEMES</h2>
+          <div class="modal-badge blue-badge">LOADOUT &amp; CODEX</div>
+          <h2>HANGAR</h2>
 
-          <div class="section-subtitle">CANNON VARIETIES (CHASSIS)</div>
-          <div id="cannon-varieties-list" class="unlock-grid"></div>
+          <div class="hangar-tabs" id="hangar-tabs">
+            <button type="button" class="hangar-tab active" data-tab="cannons">
+              <span class="tab-icon">🔫</span>
+              <span class="tab-label">Cannon</span>
+            </button>
+            <button type="button" class="hangar-tab" data-tab="addons">
+              <span class="tab-icon">🛸</span>
+              <span class="tab-label">Add-On</span>
+            </button>
+            <button type="button" class="hangar-tab" data-tab="skins">
+              <span class="tab-icon">🎨</span>
+              <span class="tab-label">Skin</span>
+            </button>
+            <button type="button" class="hangar-tab" data-tab="themes">
+              <span class="tab-icon">🏔️</span>
+              <span class="tab-label">Arena</span>
+            </button>
+            <button type="button" class="hangar-tab" data-tab="powers">
+              <span class="tab-icon">📖</span>
+              <span class="tab-label">Codex</span>
+            </button>
+          </div>
 
-          <div class="section-subtitle">TACTICAL ADD-ONS</div>
-          <div id="cannon-addons-list" class="unlock-grid"></div>
+          <div class="modal-scroll-body">
+            <div class="hangar-pane" id="pane-cannons">
+              <div id="cannon-varieties-list" class="unlock-grid"></div>
+            </div>
 
-          <div class="section-subtitle">CANNON SKINS</div>
-          <div id="cannon-skins-list" class="unlock-grid"></div>
+            <div class="hangar-pane hidden" id="pane-addons">
+              <div id="cannon-addons-list" class="unlock-grid"></div>
+            </div>
 
-          <div class="section-subtitle">ARENA THEMES</div>
-          <div id="arena-themes-list" class="unlock-grid"></div>
+            <div class="hangar-pane hidden" id="pane-skins">
+              <div id="cannon-skins-list" class="unlock-grid"></div>
+            </div>
+
+            <div class="hangar-pane hidden" id="pane-themes">
+              <div id="arena-themes-list" class="unlock-grid"></div>
+            </div>
+
+            <div class="hangar-pane hidden" id="pane-powers">
+              <div class="section-subtitle first-subtitle">FALLING POWER-UP ORBS</div>
+              <div id="powerups-guide-list" class="codex-list"></div>
+
+              <div class="section-subtitle">SPECIAL BOULDER TYPES</div>
+              <div class="legend-grid">
+                <div class="legend-item"><span>🛡️ Armored</span><small>40% dmg resist above 50% HP</small></div>
+                <div class="legend-item"><span>☄️ Meteor</span><small>Fast horizontal, lower bounce</small></div>
+                <div class="legend-item"><span>💚 Healer</span><small>Pulses +10% HP to nearby rocks</small></div>
+                <div class="legend-item"><span>👑 Milestone</span><small>Mega-Boss every 10 waves</small></div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -268,7 +304,7 @@
         </div>
       </div>
 
-      <!-- Audio & Haptics Settings Modal -->
+      <!-- Audio, Haptics & Reset Settings Modal -->
       <div id="settings-modal" class="modal-backdrop hidden">
         <div class="modal-card">
           <button class="modal-close-btn" data-close="settings-modal" aria-label="Close">✕</button>
@@ -301,21 +337,14 @@
             </div>
           </div>
 
-          <div class="rock-legend">
-            <div class="section-subtitle">BOULDER &amp; POWER-UP GUIDE</div>
-            <div class="legend-grid">
-              <div class="legend-item"><span>🛡️ Armored</span><small>40% dmg resist above 50% HP</small></div>
-              <div class="legend-item"><span>☄️ Meteor</span><small>Fast horizontal, low bounce</small></div>
-              <div class="legend-item"><span>💚 Healer</span><small>Pulses HP to nearby rocks</small></div>
-              <div class="legend-item"><span>👑 Milestone</span><small>Mega-Boss every 10 waves</small></div>
-            </div>
-          </div>
-
           <div class="modal-actions">
             <button type="button" id="open-disclaimer-settings-btn" class="action-btn secondary">
               ℹ️ LEGAL &amp; NON-COMMERCIAL NOTICE
             </button>
             <button type="button" class="action-btn primary" data-close="settings-modal">DONE</button>
+            <button type="button" id="reset-save-btn" class="text-btn danger-text-btn">
+              🗑️ Reset All Progress
+            </button>
           </div>
         </div>
       </div>
