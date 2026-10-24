@@ -35,6 +35,7 @@ html, body {
 #app-shell {
   width: 100%;
   height: 100%;
+  height: 100dvh;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -75,15 +76,19 @@ html, body {
   cursor: grabbing;
 }
 
-/* HUD */
+/* HUD - Notch & Status Bar Aware */
 #hud {
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
-  padding: 14px 12px 0;
+  padding-top: max(14px, calc(8px + env(safe-area-inset-top, 0px)));
+  padding-left: max(12px, env(safe-area-inset-left, 0px));
+  padding-right: max(12px, env(safe-area-inset-right, 0px));
+  padding-bottom: 0;
   pointer-events: none;
   z-index: 10;
+  box-sizing: border-box;
 }
 
 .hud-top-row {
@@ -664,12 +669,12 @@ html, body {
   color: var(--accent-gold);
 }
 
-/* Bottom Upgrade Panel (Sits cleanly inside the 172px underground foundation so Cannon is 100% visible) */
+/* Bottom Upgrade Panel - Home Indicator Aware */
 #upgrade-panel {
   position: absolute;
-  left: 10px;
-  right: 10px;
-  bottom: 8px;
+  left: max(10px, env(safe-area-inset-left, 0px));
+  right: max(10px, env(safe-area-inset-right, 0px));
+  bottom: max(8px, calc(4px + env(safe-area-inset-bottom, 0px)));
   z-index: 15;
   transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.25s ease;
 }
@@ -886,18 +891,20 @@ html, body {
   color: var(--text-muted);
 }
 
-/* Modals */
+/* Modals - Notch & Safe Area Protected */
 .modal-backdrop {
   position: absolute;
   inset: 0;
   background: rgba(7, 10, 22, 0.82);
   backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 16px;
+  padding: max(16px, calc(10px + env(safe-area-inset-top, 0px))) max(16px, env(safe-area-inset-right, 0px)) max(16px, calc(10px + env(safe-area-inset-bottom, 0px))) max(16px, env(safe-area-inset-left, 0px));
   z-index: 30;
   transition: opacity 0.22s ease;
+  box-sizing: border-box;
 }
 
 .modal-backdrop.hidden {
@@ -908,7 +915,7 @@ html, body {
 .modal-card {
   width: 100%;
   max-width: 350px;
-  max-height: 86vh;
+  max-height: calc(88dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
   overflow-x: hidden;
   overflow-y: auto;
   background: linear-gradient(180deg, #212c50 0%, #151d36 100%);
