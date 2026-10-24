@@ -256,8 +256,10 @@ export class CombatSystem {
     if (rock.size > 1) {
       const childSize = rock.size - 1;
       const childHp = Math.max(1, Math.floor(rock.maxHp * 0.5));
-      const spreadVx = (rock.variant === 'fast' ? 125 : 85) + Math.random() * 35;
-      const popVy = -260 - Math.random() * 50;
+      const spreadVx = (rock.variant === 'fast' ? 115 : 80) + Math.random() * 35;
+      // Asymmetric vertical pop velocities so split halves land at different times
+      const popVyLeft = -315 - Math.random() * 45;
+      const popVyRight = -225 - Math.random() * 40;
       const childVariant =
         rock.variant === 'boss' || rock.variant === 'milestoneBoss' ? 'normal' : rock.variant;
 
@@ -266,7 +268,7 @@ export class CombatSystem {
           x: rock.x - 12,
           y: rock.y,
           vx: -spreadVx,
-          vy: popVy,
+          vy: popVyLeft,
           size: childSize,
           hp: childHp,
           isBoss: false,
@@ -276,8 +278,8 @@ export class CombatSystem {
         createRock({
           x: rock.x + 12,
           y: rock.y,
-          vx: spreadVx,
-          vy: popVy,
+          vx: spreadVx * (0.88 + Math.random() * 0.24),
+          vy: popVyRight,
           size: childSize,
           hp: childHp,
           isBoss: false,

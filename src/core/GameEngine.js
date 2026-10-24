@@ -245,7 +245,9 @@ export class GameEngine {
 
   spawnCoinBurst(x, y, count = 3) {
     const wave = this.saveManager.state.wave;
-    const baseValue = Math.max(1, Math.round((1 + wave * 0.6) * this.getCoinMultiplier()));
+    // Scale coin value with wave progression so upgrades stay affordable at Wave 30+
+    const waveScale = 1 + wave * 0.75 + Math.pow(Math.max(0, wave - 10), 1.45) * 0.35;
+    const baseValue = Math.max(1, Math.round(waveScale * this.getCoinMultiplier()));
     for (let i = 0; i < count; i++) {
       this.coins.push({
         x: x + (Math.random() - 0.5) * 20,
@@ -335,8 +337,9 @@ export class GameEngine {
     const save = this.saveManager.state;
     const clearedWave = save.wave;
     const isMilestone = clearedWave % 10 === 0;
+    const waveBonusScale = 25 + clearedWave * 22 + Math.pow(Math.max(0, clearedWave - 10), 1.5) * 6;
     const waveBonus = Math.round(
-      (25 + clearedWave * 18) * (isMilestone ? 2.5 : 1) * this.getCoinMultiplier()
+      waveBonusScale * (isMilestone ? 2.5 : 1) * this.getCoinMultiplier()
     );
 
     // Auto-collect any remaining coins and power-ups on the field

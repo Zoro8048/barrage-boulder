@@ -69,12 +69,14 @@ export class PhysicsSystem {
         r.vAngle = -Math.abs(r.vAngle);
       }
 
-      // Ground bounce
+      // Ground bounce (varied per rock + slight per-bounce jitter to prevent synchronized walls)
       if (r.y + r.radius >= groundY) {
         r.y = groundY - r.radius;
-        const baseBounce = ROCK_BOUNCE_VELOCITIES[r.size] || -495;
+        const baseBounce = ROCK_BOUNCE_VELOCITIES[r.size] || -550;
         const varCfg = ROCK_VARIANTS[r.variant] || ROCK_VARIANTS.normal;
-        r.vy = baseBounce * (varCfg.bounceMultiplier || 1);
+        const perRockMult = r.bounceFactor || 1.0;
+        const liveJitter = 0.95 + Math.random() * 0.1;
+        r.vy = baseBounce * (varCfg.bounceMultiplier || 1) * perRockMult * liveJitter;
         r.hitScale = 1.1;
         engine.addParticles(r.x, groundY, 'rgba(255,255,255,0.35)', 4, 70);
       }

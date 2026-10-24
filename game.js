@@ -47,9 +47,9 @@
     3: 54,
   };
   const ROCK_BOUNCE_VELOCITIES = {
-    1: -445,
-    2: -495,
-    3: -540,
+    1: -495,
+    2: -560,
+    3: -620,
   };
 
   // --- Module: src/config/upgrades.js ---
@@ -339,8 +339,8 @@
       badge: '☄️',
       minWave: 3,
       hpMultiplier: 0.78,
-      bounceMultiplier: 0.78,
-      speedMultiplier: 1.65,
+      bounceMultiplier: 0.86,
+      speedMultiplier: 1.55,
       strokeColor: '#ff6b6b',
       abilityInterval: 0,
     },
@@ -841,6 +841,8 @@
     }
   
     const varCfg = ROCK_VARIANTS[variant] || ROCK_VARIANTS.normal;
+    // Each boulder gets its own natural bounciness (0.92x to 1.16x) so rocks don't bounce in lockstep
+    const bounceFactor = 0.92 + Math.random() * 0.24;
   
     return {
       x,
@@ -854,6 +856,7 @@
       isBoss,
       isMilestone,
       variant,
+      bounceFactor,
       armorBroken: variant !== 'armored',
       abilityTimer: varCfg.abilityInterval || 0,
       bossShieldTimer: 0,
@@ -893,6 +896,18 @@
       return acc + r.hp;
     }, 0);
   }
+  function getWaveBaseHP(waveNum) {
+    // Smooth piecewise exponential curve so Wave 25-50+ doesn't outscale player DPS
+    if (waveNum <= 12) {
+      return Math.max(2, Math.round(4 * Math.pow(1.3, waveNum - 1)));
+    }
+    const hpAt12 = 4 * Math.pow(1.3, 11);
+    if (waveNum <= 25) {
+      return Math.round(hpAt12 * Math.pow(1.19, waveNum - 12));
+    }
+    const hpAt25 = hpAt12 * Math.pow(1.19, 13);
+    return Math.round(hpAt25 * Math.pow(1.12, waveNum - 25));
+  }
   class WaveSystem {
     constructor(bus) {
       this.bus = bus;
@@ -909,7 +924,7 @@
       const isMilestoneWave = waveNum % 10 === 0 || (isBossRush && waveNum % 3 === 0);
       const isBossWave = isBossRush || waveNum % 3 === 0 || isMilestoneWave;
   
-      const baseHP = Math.max(2, Math.round(4 * Math.pow(1.33, waveNum - 1)));
+      const baseHP = getWaveBaseHP(waveNum);
   
       if (isBossRush) {
         // Boss Rush Mode: 2 to 3 high-intensity Boss & Escort boulders per wave
@@ -988,10 +1003,18 @@
       if (this.waveRocksToSpawn.length === 0) return;
   
       this.spawnTimer -= dt;
-      const maxSimultaneous = 3 + Math.min(3, Math.floor(waveNum / 3));
-      if (this.spawnTimer <= 0 && activeRocks.length < maxSimultaneous) {
+      // Weight active rocks by size so a screen full of splitting boulders doesn't get flooded
+      const activeWeight = activeRocks.reduce(
+        (sum, r) => sum + (r.size === 3 ? 2.0 : r.size === 2 ? 1.35 : 0.85),
+        0
+      );
+      const maxWeight = 4.2 + Math.min(2.5, Math.floor(waveNum / 6) * 0.5);
+  
+      if (this.spawnTimer <= 0 && (activeRocks.length === 0 || activeWeight < maxWeight)) {
         this.spawnNextRock(activeRocks, width);
-        this.spawnTimer = Math.max(1.2, 2.8 - waveNum * 0.08);
+        // Stagger spawns further apart when multiple rocks are already active on screen
+        const crowdDelay = activeRocks.length * 0.55;
+        this.spawnTimer = Math.max(1.8, 2.5 - Math.min(0.8, waveNum * 0.03) + crowdDelay);
       }
     }
   
@@ -1200,12 +1223,14 @@
           r.vAngle = -Math.abs(r.vAngle);
         }
   
-        // Ground bounce
+        // Ground bounce (varied per rock + slight per-bounce jitter to prevent synchronized walls)
         if (r.y + r.radius >= groundY) {
           r.y = groundY - r.radius;
-          const baseBounce = ROCK_BOUNCE_VELOCITIES[r.size] || -495;
+          const baseBounce = ROCK_BOUNCE_VELOCITIES[r.size] || -550;
           const varCfg = ROCK_VARIANTS[r.variant] || ROCK_VARIANTS.normal;
-          r.vy = baseBounce * (varCfg.bounceMultiplier || 1);
+          const perRockMult = r.bounceFactor || 1.0;
+          const liveJitter = 0.95 + Math.random() * 0.1;
+          r.vy = baseBounce * (varCfg.bounceMultiplier || 1) * perRockMult * liveJitter;
           r.hitScale = 1.1;
           engine.addParticles(r.x, groundY, 'rgba(255,255,255,0.35)', 4, 70);
         }
@@ -1604,8 +1629,10 @@
       if (rock.size > 1) {
         const childSize = rock.size - 1;
         const childHp = Math.max(1, Math.floor(rock.maxHp * 0.5));
-        const spreadVx = (rock.variant === 'fast' ? 125 : 85) + Math.random() * 35;
-        const popVy = -260 - Math.random() * 50;
+        const spreadVx = (rock.variant === 'fast' ? 115 : 80) + Math.random() * 35;
+        // Asymmetric vertical pop velocities so split halves land at different times
+        const popVyLeft = -315 - Math.random() * 45;
+        const popVyRight = -225 - Math.random() * 40;
         const childVariant =
           rock.variant === 'boss' || rock.variant === 'milestoneBoss' ? 'normal' : rock.variant;
   
@@ -1614,7 +1641,7 @@
             x: rock.x - 12,
             y: rock.y,
             vx: -spreadVx,
-            vy: popVy,
+            vy: popVyLeft,
             size: childSize,
             hp: childHp,
             isBoss: false,
@@ -1624,8 +1651,8 @@
           createRock({
             x: rock.x + 12,
             y: rock.y,
-            vx: spreadVx,
-            vy: popVy,
+            vx: spreadVx * (0.88 + Math.random() * 0.24),
+            vy: popVyRight,
             size: childSize,
             hp: childHp,
             isBoss: false,
@@ -1943,7 +1970,9 @@
   
     spawnCoinBurst(x, y, count = 3) {
       const wave = this.saveManager.state.wave;
-      const baseValue = Math.max(1, Math.round((1 + wave * 0.6) * this.getCoinMultiplier()));
+      // Scale coin value with wave progression so upgrades stay affordable at Wave 30+
+      const waveScale = 1 + wave * 0.75 + Math.pow(Math.max(0, wave - 10), 1.45) * 0.35;
+      const baseValue = Math.max(1, Math.round(waveScale * this.getCoinMultiplier()));
       for (let i = 0; i < count; i++) {
         this.coins.push({
           x: x + (Math.random() - 0.5) * 20,
@@ -2033,8 +2062,9 @@
       const save = this.saveManager.state;
       const clearedWave = save.wave;
       const isMilestone = clearedWave % 10 === 0;
+      const waveBonusScale = 25 + clearedWave * 22 + Math.pow(Math.max(0, clearedWave - 10), 1.5) * 6;
       const waveBonus = Math.round(
-        (25 + clearedWave * 18) * (isMilestone ? 2.5 : 1) * this.getCoinMultiplier()
+        waveBonusScale * (isMilestone ? 2.5 : 1) * this.getCoinMultiplier()
       );
   
       // Auto-collect any remaining coins and power-ups on the field

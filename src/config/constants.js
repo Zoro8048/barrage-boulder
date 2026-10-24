@@ -44,7 +44,7 @@ export const ROCK_RADII = {
 };
 
 export const ROCK_BOUNCE_VELOCITIES = {
-  1: -445,
-  2: -495,
-  3: -540,
+  1: -495,
+  2: -560,
+  3: -620,
 };

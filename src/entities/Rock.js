@@ -32,6 +32,8 @@ export function createRock({
   }
 
   const varCfg = ROCK_VARIANTS[variant] || ROCK_VARIANTS.normal;
+  // Each boulder gets its own natural bounciness (0.92x to 1.16x) so rocks don't bounce in lockstep
+  const bounceFactor = 0.92 + Math.random() * 0.24;
 
   return {
     x,
@@ -45,6 +47,7 @@ export function createRock({
     isBoss,
     isMilestone,
     variant,
+    bounceFactor,
     armorBroken: variant !== 'armored',
     abilityTimer: varCfg.abilityInterval || 0,
     bossShieldTimer: 0,

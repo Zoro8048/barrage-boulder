@@ -31,6 +31,19 @@ export function calculateWaveTotalHP(rockQueue) {
   }, 0);
 }
 
+export function getWaveBaseHP(waveNum) {
+  // Smooth piecewise exponential curve so Wave 25-50+ doesn't outscale player DPS
+  if (waveNum <= 12) {
+    return Math.max(2, Math.round(4 * Math.pow(1.3, waveNum - 1)));
+  }
+  const hpAt12 = 4 * Math.pow(1.3, 11);
+  if (waveNum <= 25) {
+    return Math.round(hpAt12 * Math.pow(1.19, waveNum - 12));
+  }
+  const hpAt25 = hpAt12 * Math.pow(1.19, 13);
+  return Math.round(hpAt25 * Math.pow(1.12, waveNum - 25));
+}
+
 export class WaveSystem {
   constructor(bus) {
     this.bus = bus;
@@ -47,7 +60,7 @@ export class WaveSystem {
     const isMilestoneWave = waveNum % 10 === 0 || (isBossRush && waveNum % 3 === 0);
     const isBossWave = isBossRush || waveNum % 3 === 0 || isMilestoneWave;
 
-    const baseHP = Math.max(2, Math.round(4 * Math.pow(1.33, waveNum - 1)));
+    const baseHP = getWaveBaseHP(waveNum);
 
     if (isBossRush) {
       // Boss Rush Mode: 2 to 3 high-intensity Boss & Escort boulders per wave
@@ -126,10 +139,18 @@ export class WaveSystem {
     if (this.waveRocksToSpawn.length === 0) return;
 
     this.spawnTimer -= dt;
-    const maxSimultaneous = 3 + Math.min(3, Math.floor(waveNum / 3));
-    if (this.spawnTimer <= 0 && activeRocks.length < maxSimultaneous) {
+    // Weight active rocks by size so a screen full of splitting boulders doesn't get flooded
+    const activeWeight = activeRocks.reduce(
+      (sum, r) => sum + (r.size === 3 ? 2.0 : r.size === 2 ? 1.35 : 0.85),
+      0
+    );
+    const maxWeight = 4.2 + Math.min(2.5, Math.floor(waveNum / 6) * 0.5);
+
+    if (this.spawnTimer <= 0 && (activeRocks.length === 0 || activeWeight < maxWeight)) {
       this.spawnNextRock(activeRocks, width);
-      this.spawnTimer = Math.max(1.2, 2.8 - waveNum * 0.08);
+      // Stagger spawns further apart when multiple rocks are already active on screen
+      const crowdDelay = activeRocks.length * 0.55;
+      this.spawnTimer = Math.max(1.8, 2.5 - Math.min(0.8, waveNum * 0.03) + crowdDelay);
     }
   }
 
