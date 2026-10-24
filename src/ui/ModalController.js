@@ -16,6 +16,7 @@ import {
   getBulletDamage,
   getBaseCoinMultiplier,
   getOfflineCoinsPerMinute,
+  getNextUpgradeMilestone,
 } from '../state/UpgradeMath.js';
 import { formatNum } from '../core/utils.js';
 
@@ -50,6 +51,8 @@ export class ModalController {
     this.statsModalEl = document.getElementById('stats-modal');
     this.settingsModalEl = document.getElementById('settings-modal');
     this.disclaimerModalEl = document.getElementById('disclaimer-modal');
+    this.augmentModalEl = document.getElementById('augment-modal');
+    this.augmentCardListEl = document.getElementById('augment-card-list');
 
     this.skinsBtn = document.getElementById('skins-btn');
     this.statsBtn = document.getElementById('stats-btn');
@@ -79,6 +82,7 @@ export class ModalController {
       !this.skinsModalEl.classList.contains('hidden') ||
       !this.statsModalEl.classList.contains('hidden') ||
       !this.settingsModalEl.classList.contains('hidden') ||
+      (this.augmentModalEl && !this.augmentModalEl.classList.contains('hidden')) ||
       (this.disclaimerModalEl && !this.disclaimerModalEl.classList.contains('hidden'))
     );
   }
@@ -118,6 +122,12 @@ export class ModalController {
 
     this.bus.on('run:revived', () => {
       this.gameoverModalEl.classList.add('hidden');
+    });
+
+    this.bus.on('augment:offered', ({ options }) => {
+      this.inputSystem?.reset();
+      this.renderAugmentOptions(options);
+      this.augmentModalEl?.classList.remove('hidden');
     });
 
     // Upgrade Card Clicks & Press-and-Hold Auto-Upgrade
@@ -322,6 +332,13 @@ export class ModalController {
         statEl.textContent = `${Math.round(getBaseCoinMultiplier(lvl) * 100)}%`;
       } else if (type === 'offlineEarnings') {
         statEl.textContent = `${formatNum(getOfflineCoinsPerMinute(lvl))}/m`;
+      }
+
+      const perkEl = document.getElementById(`perk-${type}`);
+      if (perkEl) {
+        const milestone = getNextUpgradeMilestone(type, lvl);
+        perkEl.textContent = milestone.text;
+        perkEl.classList.toggle('maxed', milestone.isMax);
       }
 
       if (save.coins >= cost) {
@@ -567,5 +584,34 @@ export class ModalController {
       };
     }
     this.engine.saveManager.persist();
+  }
+
+  renderAugmentOptions(options) {
+    if (!this.augmentCardListEl) return;
+    this.augmentCardListEl.innerHTML = options
+      .map(
+        (aug) => `
+        <div class="augment-card" data-augment-id="${aug.id}" style="--aug-accent: ${aug.color || '#ffcf33'}">
+          <div class="augment-card-header">
+            <span class="augment-card-icon">${aug.icon}</span>
+            <span class="augment-card-badge">TACTICAL AUGMENT</span>
+          </div>
+          <div class="augment-card-title">${aug.name}</div>
+          <div class="augment-card-desc">${aug.desc || aug.description}</div>
+          <button type="button" class="action-btn primary augment-select-btn">SELECT PERK</button>
+        </div>
+      `
+      )
+      .join('');
+
+    this.augmentCardListEl.querySelectorAll('.augment-card').forEach((card) => {
+      card.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const augId = card.getAttribute('data-augment-id');
+        this.audioService.init();
+        this.engine.activateAugment(augId);
+        this.augmentModalEl?.classList.add('hidden');
+      });
+    });
   }
 }

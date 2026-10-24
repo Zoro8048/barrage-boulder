@@ -28,6 +28,7 @@ export class CombatSystem {
     const isPierce = activePowerups.piercingLaser > 0;
     const isExplosive = activePowerups.explosiveRounds > 0;
     const isSpreadPowerup = activePowerups.spreadShot > 0;
+    const hasBankShot = engine.activeAugments && engine.activeAugments.includes('wallRicochet');
 
     const speed =
       variety.id === 'railgun'
@@ -40,6 +41,26 @@ export class CombatSystem {
     const splashRadius = isExplosive ? 95 : variety.splashRadius || 0;
     const dmgRatio = (variety.damageMult || 1) * (isGiant ? 2.0 : 1.0);
     const bulletRadius = isGiant ? 11.5 : variety.id === 'railgun' ? 7 : isOverdrive ? 6 : 5.5;
+
+    // Hyper-Lance Perk (Fire Rate Lv. 25+): Every 12th volley fires a free piercing cyan Laser Lance!
+    engine.volleyCount = (engine.volleyCount || 0) + 1;
+    if (!isPierce && saveManager.state.upgrades.fireRate >= 25 && engine.volleyCount % 12 === 0) {
+      engine.laserBeams.push({
+        x: cannon.x,
+        y: cannon.y - 48,
+        width: 14,
+        color: '#00d2d3',
+        life: 0.8,
+      });
+      const lanceDmg = Math.max(1, Math.round(engine.getBulletDamage() * 1.6));
+      for (let j = engine.rocks.length - 1; j >= 0; j--) {
+        const r = engine.rocks[j];
+        if (r && Math.abs(r.x - cannon.x) <= r.radius + 14) {
+          engine.addParticles(cannon.x, r.y + r.radius * 0.4, '#00d2d3', 4, 140);
+          this.applyDamageToRock(r, lanceDmg, engine, { isCrit: false, isLaser: true });
+        }
+      }
+    }
 
     // Determine distinct projectile shape so every power-up looks and feels unique
     const bulletShape = isGiant
@@ -98,7 +119,7 @@ export class CombatSystem {
           radius: bulletRadius,
           shape: bulletShape,
           spinAngle: 0,
-          bouncesLeft: isSpreadPowerup ? 2 : 0,
+          bouncesLeft: isSpreadPowerup ? 2 : hasBankShot ? 1 : 0,
           overdrive: isOverdrive,
           isGiant,
           isPierce: pierceLeft > 0,
@@ -203,6 +224,7 @@ export class CombatSystem {
   }
 
   applyDamageToRock(r, rawDmg, engine, { isCrit = false, isZap = false } = {}) {
+    if (!r || r.destroyed || r.hp <= 0) return 0;
     const { rocks, saveManager, waveSystem } = engine;
     const save = saveManager.state;
     const idx = rocks.indexOf(r);
@@ -217,11 +239,30 @@ export class CombatSystem {
     const frostMult = isFrozen ? 1.25 : 1.0;
     const hasIntactArmor = r.variant === 'armored' && !r.armorBroken;
     const armorScale = ROCK_VARIANTS.armored.armorDamageScale;
-    const boostedDmg = Math.max(1, Math.round(rawDmg * frostMult));
+    let boostedDmg = Math.max(1, Math.round(rawDmg * frostMult));
+
+    // Executioner Perk (Fire Power Lv. 10+): +45% damage to low HP rocks (<35% HP)
+    if (save.upgrades.firePower >= 10 && r.hp <= r.maxHp * 0.35) {
+      boostedDmg = Math.round(boostedDmg * 1.45);
+    }
+
     const afterArmor = hasIntactArmor ? Math.max(1, Math.round(boostedDmg * armorScale)) : boostedDmg;
     const actualDmg = Math.min(r.hp, afterArmor);
 
     r.hp -= actualDmg;
+
+    // Progressive Fracture Cracks & Debris Shedding
+    const col = getRockColorTier(r.maxHp);
+    const hpRatio = r.hp / r.maxHp;
+    if (r.crackStage === 0 && hpRatio <= 0.65) {
+      r.crackStage = 1;
+      r.hitScale = 1.25;
+      engine.addParticles(r.x, r.y, col.dark, 6, 140);
+    } else if (r.crackStage === 1 && hpRatio <= 0.30) {
+      r.crackStage = 2;
+      r.hitScale = 1.32;
+      engine.addParticles(r.x, r.y, col.fill, 9, 175);
+    }
 
     engine.comboCount += 1;
     engine.comboTimer = COMBAT.COMBO_DECAY_TIME;
@@ -236,6 +277,22 @@ export class CombatSystem {
 
     if (isCrit) {
       engine.addFloatingText(r.x, r.y - 12, `💥 ${formatNum(actualDmg)}!`, '#ff4757', 14);
+
+      // Chain Volt Augment: Crits zap another boulder for 75% lightning damage
+      if (engine.activeAugments && engine.activeAugments.includes('chainVolt') && rocks.length > 1) {
+        const otherTarget = rocks.find((other) => other !== r && !other.destroyed && other.hp > 0);
+        if (otherTarget) {
+          const voltDmg = Math.max(1, Math.round(actualDmg * 0.75));
+          engine.laserBeams.push({
+            x: otherTarget.x,
+            y: otherTarget.y,
+            width: 8,
+            color: '#48dbfb',
+            life: 0.2,
+          });
+          this.applyDamageToRock(otherTarget, voltDmg, engine, { isCrit: false, isZap: true });
+        }
+      }
     } else if (isZap) {
       engine.addFloatingText(r.x, r.y - 10, `⚡ ${formatNum(actualDmg)}`, '#48dbfb', 13);
     }
@@ -282,11 +339,16 @@ export class CombatSystem {
     const variety = saveManager.getActiveCannon();
     const addon = saveManager.getActiveAddon();
 
+    const hasDeadeye = engine.activeAugments && engine.activeAugments.includes('deadeyeCrit');
     const critChance =
       COMBAT.CRIT_CHANCE +
       (variety.critBonus || 0) +
-      (addon.id === 'laserSight' ? 0.18 : 0);
-    const critMult = COMBAT.CRIT_MULTIPLIER + (addon.id === 'laserSight' ? 0.5 : 0);
+      (addon.id === 'laserSight' ? 0.18 : 0) +
+      (hasDeadeye ? 0.15 : 0);
+    const critMult =
+      COMBAT.CRIT_MULTIPLIER +
+      (addon.id === 'laserSight' ? 0.5 : 0) +
+      (hasDeadeye ? 0.4 : 0);
 
     for (let i = bullets.length - 1; i >= 0; i--) {
       const b = bullets[i];
@@ -366,7 +428,7 @@ export class CombatSystem {
             const splashDmg = Math.max(1, Math.round(scaledDmg * 0.5));
             for (let k = rocks.length - 1; k >= 0; k--) {
               const other = rocks[k];
-              if (!other || other === r) continue;
+              if (!other || other === r || other.destroyed || other.hp <= 0) continue;
               const d = Math.hypot(other.x - b.x, other.y - b.y);
               if (d <= b.splashRadius + other.radius) {
                 this.applyDamageToRock(other, splashDmg, engine, { isCrit: false });
@@ -418,9 +480,18 @@ export class CombatSystem {
   }
 
   destroyRock(rock, index, engine, fromUltimate = false) {
+    if (!rock || rock.destroyed) return;
+    rock.destroyed = true;
+
     const { rocks, saveManager, waveSystem, achievementTracker } = engine;
     const save = saveManager.state;
     const col = getRockColorTier(rock.maxHp);
+
+    // Eagerly remove from active rocks array so cascading AoE and splash logic never re-target this rock
+    const currentIdx = rocks.indexOf(rock);
+    if (currentIdx !== -1) {
+      rocks.splice(currentIdx, 1);
+    }
 
     engine.addParticles(rock.x, rock.y, col.fill, rock.size * 8, 220);
     this.bus.emit('rock:destroyed', { size: rock.size, isBoss: rock.isBoss });
@@ -431,17 +502,93 @@ export class CombatSystem {
     }
 
     save.stats.rocksDestroyed += 1;
-    if (rock.isBoss) {
-      save.stats.bossesDefeated += 1;
-      engine.maybeSpawnPowerup(rock.x, rock.y, true);
-      engine.spawnCoinBurst(rock.x, rock.y, rock.isMilestone ? 12 : 6);
-    } else if (rock.size === 1) {
-      engine.maybeSpawnPowerup(rock.x, rock.y, false);
+
+    // Shatter Blast Perk (Fire Power Lv. 20+): 25% AoE splash to nearby boulders on kill
+    if (save.upgrades.firePower >= 20) {
+      const shatterDmg = Math.max(1, Math.round(engine.getBulletDamage() * 0.25));
+      engine.addShockwave(rock.x, rock.y, 80, 'rgba(255, 159, 26, 0.6)');
+      for (let k = rocks.length - 1; k >= 0; k--) {
+        const other = rocks[k];
+        if (
+          other &&
+          other !== rock &&
+          !other.destroyed &&
+          other.hp > 0 &&
+          Math.hypot(other.x - rock.x, other.y - rock.y) <= 80 + other.radius
+        ) {
+          this.applyDamageToRock(other, shatterDmg, engine, { isCrit: false });
+        }
+      }
     }
 
-    rocks.splice(index, 1);
+    // Shrapnel Core Augment: fire 2 upward shrapnel bolts into the sky
+    if (engine.activeAugments && engine.activeAugments.includes('shrapnelCore')) {
+      for (const ang of [-0.4, 0.4]) {
+        engine.bullets.push(
+          engine.bulletPool.acquire({
+            x: rock.x,
+            y: rock.y,
+            vx: Math.sin(ang) * 540,
+            vy: -Math.cos(ang) * 540,
+            radius: 4.5,
+            shape: 'shrapnel',
+            spinAngle: 0,
+            bouncesLeft: 0,
+            overdrive: false,
+            isGiant: false,
+            isPierce: false,
+            pierceLeft: 0,
+            splashRadius: 0,
+            spawnClusters: false,
+            lastHitRock: rock,
+            isDrone: false,
+            damageRatio: 0.5,
+          })
+        );
+      }
+    }
 
-    if (rock.size > 1) {
+    if (rock.variant === 'tntBarrel') {
+      // 🧨 Volatile TNT Barrel: Massive 180px chain explosion!
+      engine.triggerShake(14, 0.35);
+      engine.addShockwave(rock.x, rock.y, 180, 'rgba(255, 71, 87, 0.9)');
+      engine.addParticles(rock.x, rock.y, '#ff4757', 22, 280);
+      engine.addFloatingText(rock.x, rock.y - 18, '🧨 KABOOM!', '#ff4757', 18);
+      const tntDamage = Math.max(15, Math.round(engine.getBulletDamage() * 10));
+      for (let k = rocks.length - 1; k >= 0; k--) {
+        const other = rocks[k];
+        if (
+          other &&
+          other !== rock &&
+          !other.destroyed &&
+          other.hp > 0 &&
+          Math.hypot(other.x - rock.x, other.y - rock.y) <= 180 + other.radius
+        ) {
+          this.applyDamageToRock(other, tntDamage, engine, { isCrit: true });
+        }
+      }
+      engine.spawnCoinBurst(rock.x, rock.y, 4);
+    } else if (rock.variant === 'goldGeode') {
+      // 💎 Golden Geode: Jackpot of 8 coins + guaranteed Power-Up!
+      engine.triggerShake(8, 0.2);
+      engine.addShockwave(rock.x, rock.y, 120, 'rgba(255, 207, 51, 0.85)');
+      engine.addParticles(rock.x, rock.y, '#ffcf33', 18, 220);
+      engine.addFloatingText(rock.x, rock.y - 18, '💎 JACKPOT GEODE!', '#ffcf33', 16);
+      engine.maybeSpawnPowerup(rock.x, rock.y, true);
+      engine.spawnCoinBurst(rock.x, rock.y, 8);
+    } else if (rock.isBoss) {
+      save.stats.bossesDefeated += 1;
+      engine.maybeSpawnPowerup(rock.x, rock.y, true);
+      const coinCount = rock.isMilestone ? 14 : 7;
+      // Boss Bounty perk (Coin Value Lv. 20+): 2x coins
+      const bountyMult = save.upgrades.coinValue >= 20 ? 2 : 1;
+      engine.spawnCoinBurst(rock.x, rock.y, coinCount * bountyMult);
+    } else if (rock.size === 1) {
+      const dropBonus = engine.activeAugments?.includes('midasTouch') ? 0.08 : 0;
+      engine.maybeSpawnPowerup(rock.x, rock.y, false, dropBonus);
+    }
+
+    if (rock.size > 1 && rock.variant !== 'tntBarrel' && rock.variant !== 'goldGeode') {
       const childSize = rock.size - 1;
       const childHp = Math.max(1, Math.floor(rock.maxHp * 0.5));
       const spreadVx = (rock.variant === 'fast' ? 115 : 80) + Math.random() * 35;

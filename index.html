@@ -60,6 +60,10 @@
         <!-- Active Power-up Pills (with effect description) -->
         <div id="powerup-hud" class="powerup-hud"></div>
 
+        <!-- 3-Segment Hull Shield Integrity & Active Run Augments -->
+        <div id="hull-hud" class="hull-hud hidden"></div>
+        <div id="augment-hud" class="augment-hud hidden"></div>
+
         <div class="score-display">
           <div id="current-score">0</div>
           <div id="best-score">BEST: 0</div>
@@ -116,6 +120,7 @@
             </div>
             <div class="upg-stat" id="stat-fireRate">100%</div>
             <div class="upg-level" id="lvl-fireRate">Lv. 1</div>
+            <div class="upg-perk" id="perk-fireRate">🎯 Lv.4: 2 Barrels</div>
             <div class="upg-cost">
               <span>🪙</span>
               <span id="cost-fireRate">10</span>
@@ -129,6 +134,7 @@
             </div>
             <div class="upg-stat" id="stat-firePower">100%</div>
             <div class="upg-level" id="lvl-firePower">Lv. 1</div>
+            <div class="upg-perk" id="perk-firePower">🎯 Lv.10: +45% Exec</div>
             <div class="upg-cost">
               <span>🪙</span>
               <span id="cost-firePower">10</span>
@@ -142,6 +148,7 @@
             </div>
             <div class="upg-stat" id="stat-coinValue">100%</div>
             <div class="upg-level" id="lvl-coinValue">Lv. 1</div>
+            <div class="upg-perk" id="perk-coinValue">🎯 Lv.10: +Geodes</div>
             <div class="upg-cost">
               <span>🪙</span>
               <span id="cost-coinValue">15</span>
@@ -155,6 +162,7 @@
             </div>
             <div class="upg-stat" id="stat-offlineEarnings">100%</div>
             <div class="upg-level" id="lvl-offlineEarnings">Lv. 1</div>
+            <div class="upg-perk" id="perk-offlineEarnings">🎯 Lv.10: +1 Hull</div>
             <div class="upg-cost">
               <span>🪙</span>
               <span id="cost-offlineEarnings">15</span>
@@ -219,6 +227,16 @@
               UPGRADE &amp; RETRY
             </button>
           </div>
+        </div>
+      </div>
+
+      <!-- Boss Conquered: Tactical Augment Draft Modal (Pick 1 of 3) -->
+      <div id="augment-modal" class="modal-backdrop hidden">
+        <div class="modal-card wide-modal">
+          <div class="modal-badge gold-badge">👑 BOSS CONQUERED!</div>
+          <h2>CHOOSE AN AUGMENT</h2>
+          <p class="offline-desc">Select 1 tactical augment to enhance your build for this run:</p>
+          <div id="augment-card-list" class="augment-grid"></div>
         </div>
       </div>
 

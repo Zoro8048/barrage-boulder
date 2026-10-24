@@ -9,6 +9,7 @@ import {
   getBulletDamage,
   getCoinMultiplier,
   calculateOfflineEarnings,
+  getNextUpgradeMilestone,
 } from '../src/state/UpgradeMath.js';
 
 test('UpgradeMath - getUpgradeCost scales exponentially', () => {
@@ -69,4 +70,31 @@ test('UpgradeMath - getComboMultiplier scales at 5, 10, 25, and 50 hit streaks',
   assert.equal(getComboMultiplier(10), 1.5);
   assert.equal(getComboMultiplier(25), 2.0);
   assert.equal(getComboMultiplier(50), 2.5);
+});
+
+test('UpgradeMath - getNextUpgradeMilestone returns accurate target labels and max states', () => {
+  const fr1 = getNextUpgradeMilestone('fireRate', 1);
+  assert.equal(fr1.level, 4);
+  assert.equal(fr1.text, '🎯 Lv.4: 2 Barrels');
+  assert.equal(fr1.isMax, false);
+
+  const fr15 = getNextUpgradeMilestone('fireRate', 15);
+  assert.equal(fr15.level, 25);
+  assert.equal(fr15.text, '🎯 Lv.25: Auto-Laser');
+
+  const fr25 = getNextUpgradeMilestone('fireRate', 25);
+  assert.equal(fr25.isMax, true);
+  assert.equal(fr25.text, '✨ MAX PERKS');
+
+  const fp1 = getNextUpgradeMilestone('firePower', 1);
+  assert.equal(fp1.level, 10);
+  assert.equal(fp1.text, '🎯 Lv.10: +45% Exec');
+
+  const cv1 = getNextUpgradeMilestone('coinValue', 1);
+  assert.equal(cv1.level, 10);
+  assert.equal(cv1.text, '🎯 Lv.10: +Geodes');
+
+  const oe1 = getNextUpgradeMilestone('offlineEarnings', 1);
+  assert.equal(oe1.level, 10);
+  assert.equal(oe1.text, '🎯 Lv.10: +1 Hull 🛡️');
 });

@@ -10,9 +10,11 @@ export function pickRockVariant(waveNum, isBoss, isMilestone, rng = Math.random)
   if (isMilestone) return 'milestoneBoss';
   if (isBoss) return 'boss';
   const roll = rng();
-  if (waveNum >= 4 && roll < 0.16) return 'healer';
-  if (waveNum >= 3 && roll < 0.34) return 'fast';
-  if (waveNum >= 2 && roll < 0.52) return 'armored';
+  if (waveNum >= 2 && roll < 0.09) return 'tntBarrel';
+  if (waveNum >= 2 && roll < 0.17) return 'goldGeode';
+  if (waveNum >= 4 && roll < 0.28) return 'healer';
+  if (waveNum >= 3 && roll < 0.44) return 'fast';
+  if (waveNum >= 2 && roll < 0.60) return 'armored';
   return 'normal';
 }
 
@@ -104,10 +106,15 @@ export class WaveSystem {
         }
 
         const variant = pickRockVariant(waveNum, isBoss, isBoss && isMilestoneWave, rng);
+        if (variant === 'tntBarrel' || variant === 'goldGeode') {
+          size = 1;
+        }
         let sizeMult = size === 3 ? 2.2 : size === 2 ? 1.2 : 0.6;
         if (variant === 'milestoneBoss') sizeMult = 4.2;
         else if (variant === 'boss') sizeMult = 2.8;
         else if (variant === 'fast') sizeMult *= 0.78;
+        else if (variant === 'tntBarrel') sizeMult = 0.75;
+        else if (variant === 'goldGeode') sizeMult = 0.85;
 
         const hp = Math.max(1, Math.round(baseHP * sizeMult * (0.85 + rng() * 0.3)));
 

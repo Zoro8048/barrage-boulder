@@ -35,6 +35,17 @@ export function createRock({
   // Each boulder gets its own natural bounciness (0.92x to 1.16x) so rocks don't bounce in lockstep
   const bounceFactor = 0.92 + Math.random() * 0.24;
 
+  // Pre-build 3 jagged fracture crack paths for progressive damage visualization
+  const cracks = [0, 1, 2].map((cIdx) => {
+    const vTarget = vertices[(cIdx * 2 + 1) % vertices.length];
+    return {
+      midX: vTarget.x * 0.45 + (Math.sin(cIdx * 3.1) * radius * 0.16),
+      midY: vTarget.y * 0.45 + (Math.cos(cIdx * 2.3) * radius * 0.16),
+      endX: vTarget.x * 0.92,
+      endY: vTarget.y * 0.92,
+    };
+  });
+
   return {
     x,
     y,
@@ -51,6 +62,9 @@ export function createRock({
     armorBroken: variant !== 'armored',
     abilityTimer: varCfg.abilityInterval || 0,
     bossShieldTimer: 0,
+    chillTimer: 0,
+    crackStage: 0,
+    cracks,
     angle: Math.random() * Math.PI * 2,
     vAngle: (vx > 0 ? 1 : -1) * (variant === 'fast' ? 2.4 : 0.8 + Math.random() * 1.2),
     hitScale: fromSplit ? 1.22 : 1,

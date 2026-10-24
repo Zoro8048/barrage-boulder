@@ -20,6 +20,7 @@ const MODULE_ORDER = [
   'src/config/themes.js',
   'src/config/cannons.js',
   'src/config/addons.js',
+  'src/config/augments.js',
   'src/config/powerups.js',
   'src/config/rockVariants.js',
   'src/config/achievements.js',

@@ -4,6 +4,7 @@
  */
 
 import { POWERUP_META } from '../config/powerups.js';
+import { TACTICAL_AUGMENTS } from '../config/augments.js';
 import { formatNum } from '../core/utils.js';
 
 export class HudController {
@@ -25,6 +26,8 @@ export class HudController {
     this.bossHudLabelEl = document.getElementById('boss-hud-label');
     this.bossBarFillEl = document.getElementById('boss-bar-fill');
     this.powerupHudEl = document.getElementById('powerup-hud');
+    this.hullHudEl = document.getElementById('hull-hud');
+    this.augmentHudEl = document.getElementById('augment-hud');
     this.achToastEl = document.getElementById('achievement-toast');
     this.achToastIconEl = document.getElementById('ach-toast-icon');
     this.achToastLabelEl = document.getElementById('ach-toast-label');
@@ -82,6 +85,14 @@ export class HudController {
       this.updatePowerupHUD(activePowerups);
     });
 
+    this.bus.on('hull:updated', ({ hull, maxHull }) => {
+      this.updateHullHUD(hull, maxHull);
+    });
+
+    this.bus.on('augment:updated', (activeAugments) => {
+      this.updateAugmentHUD(activeAugments);
+    });
+
     this.bus.on('combo:updated', ({ count, multiplier }) => {
       if (!this.comboPillEl) return;
       if (count >= 5) {
@@ -120,6 +131,8 @@ export class HudController {
       this.lobbyModeWrapEl?.classList.add('hidden');
       this.upgradePanelEl.classList.add('hidden');
       this.pauseBtn?.classList.remove('hidden');
+      this.hullHudEl?.classList.remove('hidden');
+      this.augmentHudEl?.classList.remove('hidden');
     });
 
     this.bus.on('run:resumed', () => {
@@ -129,6 +142,8 @@ export class HudController {
     this.bus.on('run:gameover', () => {
       this.pauseBtn?.classList.add('hidden');
       this.lobbyModeWrapEl?.classList.add('hidden');
+      this.hullHudEl?.classList.add('hidden');
+      this.augmentHudEl?.classList.add('hidden');
     });
 
     this.bus.on('run:lobby', () => {
@@ -137,6 +152,8 @@ export class HudController {
       this.startPromptEl.classList.remove('hidden');
       this.lobbyModeWrapEl?.classList.remove('hidden');
       this.upgradePanelEl.classList.remove('hidden');
+      this.hullHudEl?.classList.add('hidden');
+      this.augmentHudEl?.classList.add('hidden');
     });
   }
 
@@ -209,6 +226,43 @@ export class HudController {
           <span>${meta.label}</span>
           <span class="powerup-pill-desc">(${meta.hudDesc})</span>
           <span class="powerup-pill-time">${remaining.toFixed(1)}s</span>
+        </div>`;
+      })
+      .join('');
+  }
+
+  updateHullHUD(hull, maxHull) {
+    if (!this.hullHudEl) return;
+    const safeHull = Math.max(0, hull ?? 0);
+    const safeMax = Math.max(1, maxHull ?? 3);
+    let pips = '';
+    for (let i = 0; i < safeMax; i++) {
+      const active = i < safeHull;
+      const isCritical = safeHull === 1 && active;
+      pips += `<span class="hull-pip ${active ? 'active' : 'depleted'} ${isCritical ? 'critical' : ''}" title="Hull Shield ${i + 1}/${safeMax}">🛡️</span>`;
+    }
+    this.hullHudEl.innerHTML = `
+      <div class="hull-badge">
+        <span class="hull-label">HULL</span>
+        <div class="hull-pips">${pips}</div>
+      </div>
+    `;
+  }
+
+  updateAugmentHUD(activeAugments) {
+    if (!this.augmentHudEl) return;
+    if (!activeAugments || activeAugments.length === 0) {
+      this.augmentHudEl.innerHTML = '';
+      return;
+    }
+    const map = new Map(TACTICAL_AUGMENTS.map((a) => [a.id, a]));
+    this.augmentHudEl.innerHTML = activeAugments
+      .map((id) => {
+        const aug = map.get(id);
+        if (!aug) return '';
+        return `<div class="aug-chip" title="${aug.name}: ${aug.desc || aug.description}" style="border-color:${aug.color || '#48dbfb'}">
+          <span class="aug-chip-icon">${aug.icon}</span>
+          <span class="aug-chip-name">${aug.name}</span>
         </div>`;
       })
       .join('');

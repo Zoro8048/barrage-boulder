@@ -501,9 +501,34 @@ export class CanvasRenderer {
     ctx.closePath();
     ctx.fillStyle = r.hitFlash > 0 ? 'rgba(255,255,255,0.6)' : col.dark;
     ctx.fill();
+
+    // Progressive Internal Fracture Cracks (Appear below 65% HP, glow hot below 30% HP)
+    if (r.cracks && r.crackStage >= 1) {
+      const count = r.crackStage >= 2 ? r.cracks.length : 2;
+      ctx.save();
+      ctx.strokeStyle = r.crackStage >= 2 ? '#ffda79' : 'rgba(0, 0, 0, 0.6)';
+      ctx.lineWidth = r.crackStage >= 2 ? 2.5 : 1.8;
+      ctx.beginPath();
+      for (let c = 0; c < count; c++) {
+        const ck = r.cracks[c];
+        ctx.moveTo(0, 0);
+        ctx.lineTo(ck.midX, ck.midY);
+        ctx.lineTo(ck.endX, ck.endY);
+      }
+      ctx.stroke();
+      ctx.restore();
+    }
     ctx.restore();
 
-    if (r.isMilestone) {
+    if (r.variant === 'tntBarrel') {
+      ctx.font = '15px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('🧨', 0, -r.radius - 8);
+    } else if (r.variant === 'goldGeode') {
+      ctx.font = '15px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('💎', 0, -r.radius - 8);
+    } else if (r.isMilestone) {
       ctx.font = '21px sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText('👑', 0, -r.radius - 10);

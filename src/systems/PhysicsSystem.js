@@ -138,7 +138,7 @@ export class PhysicsSystem {
             const sawDmg = Math.max(2, Math.round(engine.getBulletDamage() * 4.5));
             combatSystem.applyDamageToRock(r, sawDmg, engine, { isCrit: true });
           } else {
-            engine.triggerGameOver(r);
+            engine.takeHullDamage(r);
             break;
           }
         }

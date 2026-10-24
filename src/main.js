@@ -80,8 +80,13 @@ function bootstrap() {
     const dt = Math.min(0.05, (now - lastTime) / 1000);
     lastTime = now;
 
-    engine.update(dt, inputSystem, modalController.isAnyModalOpen());
-    renderer.render(now);
+    try {
+      engine.update(dt, inputSystem, modalController.isAnyModalOpen());
+      renderer.render(now);
+    } catch (err) {
+      console.error('Boulder Barrage runtime error caught:', err);
+    }
+
     requestAnimationFrame(loop);
   }
 

@@ -4,6 +4,7 @@
 
 import { PHYSICS, COMBAT } from '../config/constants.js';
 import { POWERUP_META, POWERUP_DROP_CHANCE } from '../config/powerups.js';
+import { TACTICAL_AUGMENTS } from '../config/augments.js';
 import { ObjectPool } from './ObjectPool.js';
 import { formatNum } from './utils.js';
 import {
@@ -45,6 +46,12 @@ export class GameEngine {
     this.ultimateCharge = 0;
     this.ultimateBeamTimer = 0;
     this.deathSlowMoTimer = 0;
+
+    // 3-Segment Hull Shield Integrity & Run Augments
+    this.maxHull = 3;
+    this.hull = 3;
+    this.activeAugments = [];
+    this.recalcMaxHull();
 
     this.activePowerups = {
       rapidFire: 0,
@@ -118,13 +125,25 @@ export class GameEngine {
   }
 
   // --- Computed Stats ---
+  recalcMaxHull() {
+    let max = 3;
+    if (this.saveManager?.state?.upgrades?.offlineEarnings >= 10) max += 1;
+    if (this.activeAugments && this.activeAugments.includes('aegisPlating')) max += 1;
+    this.maxHull = max;
+    this.hull = Math.min(this.hull || max, max);
+    if (this.bus) {
+      this.bus.emit('hull:updated', { hull: this.hull, maxHull: this.maxHull });
+    }
+  }
+
   getFireRateShotsPerSec() {
     const variety = this.saveManager.getActiveCannon();
     const base = getFireRateShotsPerSec(
       this.saveManager.state.upgrades.fireRate,
       this.activePowerups.rapidFire > 0
     );
-    return base * (variety.fireRateMult || 1);
+    const augMult = this.activeAugments?.includes('hyperLoader') ? 1.25 : 1.0;
+    return base * (variety.fireRateMult || 1) * augMult;
   }
 
   getBarrelCount() {
@@ -143,11 +162,13 @@ export class GameEngine {
   }
 
   getCoinMultiplier() {
-    return getCoinMultiplier(
+    const base = getCoinMultiplier(
       this.saveManager.state.upgrades.coinValue,
       this.activePowerups.magnet > 0,
       this.gameMode === 'BOSS_RUSH'
     );
+    const augMult = this.activeAugments?.includes('midasTouch') ? 1.35 : 1.0;
+    return base * augMult;
   }
 
   isBossRushUnlocked() {
@@ -171,6 +192,11 @@ export class GameEngine {
     save.wave = nextWave;
     this.saveManager.persist();
     this.setupCurrentWave();
+    this.activeAugments = [];
+    this.recalcMaxHull();
+    this.hull = this.maxHull;
+    this.bus.emit('augment:updated', this.activeAugments);
+    this.bus.emit('hull:updated', { hull: this.hull, maxHull: this.maxHull });
     this.bus.emit('run:lobby');
     return true;
   }
@@ -254,7 +280,8 @@ export class GameEngine {
   activatePowerup(type, x, y) {
     const meta = POWERUP_META[type];
     if (!meta) return;
-    this.activePowerups[type] = meta.duration;
+    const durBonus = this.saveManager.state.upgrades.offlineEarnings >= 20 ? 1.25 : 1.0;
+    this.activePowerups[type] = meta.duration * durBonus;
     this.saveManager.state.stats.powerupsCollected += 1;
     this.bus.emit('powerup:collected', { type, meta });
     this.addParticles(x, y, meta.color, 18, 220);
@@ -268,6 +295,51 @@ export class GameEngine {
     this.achievementTracker.checkUnlockables();
     this.saveManager.persist();
     this.bus.emit('powerup:updated', this.activePowerups);
+  }
+
+  takeHullDamage(rock) {
+    if (this.invulnerableTimer > 0 || this.activePowerups.shield > 0) return;
+    if (rock.variant === 'tntBarrel' || rock.variant === 'goldGeode') {
+      rock.vy = -450;
+      return;
+    }
+
+    const dmg = rock.isBoss ? 2 : 1;
+    this.hull = Math.max(0, this.hull - dmg);
+    this.bus.emit('hull:updated', { hull: this.hull, maxHull: this.maxHull });
+
+    if (this.hull > 0) {
+      this.invulnerableTimer = 1.35;
+      rock.vy = -510;
+      rock.y = Math.min(rock.y, this.cannon.y - 45);
+      this.triggerShake(9, 0.22);
+      this.addShockwave(this.cannon.x, this.cannon.y - 24, 90, '#ff4757');
+      this.addFloatingText(
+        this.cannon.x,
+        this.cannon.y - 44,
+        `⚠️ HULL HIT! ${this.hull}/${this.maxHull} SHIELDS`,
+        '#ff4757',
+        14
+      );
+      this.bus.emit('sfx:hit', { hpRatio: 0.1, armored: true });
+    } else {
+      this.triggerGameOver(rock);
+    }
+  }
+
+  activateAugment(augmentId) {
+    if (!this.activeAugments) this.activeAugments = [];
+    if (!this.activeAugments.includes(augmentId)) {
+      this.activeAugments.push(augmentId);
+    }
+    if (augmentId === 'aegisPlating') {
+      this.recalcMaxHull();
+      this.hull = this.maxHull;
+    } else {
+      this.hull = Math.min(this.maxHull, this.hull + 1);
+    }
+    this.bus.emit('hull:updated', { hull: this.hull, maxHull: this.maxHull });
+    this.bus.emit('augment:updated', this.activeAugments);
   }
 
   spawnCoinBurst(x, y, count = 3) {
@@ -339,6 +411,9 @@ export class GameEngine {
     this.gameState = 'PLAYING';
     this.saveManager.state.stats.runsPlayed += 1;
     this.saveManager.persist();
+    this.recalcMaxHull();
+    this.hull = this.maxHull;
+    this.bus.emit('hull:updated', { hull: this.hull, maxHull: this.maxHull });
     this.setupCurrentWave();
     this.bus.emit('run:started');
     this.bus.emit('ultimate:updated', this.ultimateCharge);
@@ -389,6 +464,21 @@ export class GameEngine {
     }
     this.awardCoins(waveBonus);
 
+    // Full Hull repair between waves
+    this.recalcMaxHull();
+    this.hull = this.maxHull;
+    this.bus.emit('hull:updated', { hull: this.hull, maxHull: this.maxHull });
+
+    // Boss Wave Cleared (every 3 waves or in Boss Rush): Offer 3 Tactical Augments
+    const isBossCleared = clearedWave % 3 === 0 || this.gameMode === 'BOSS_RUSH';
+    if (isBossCleared && TACTICAL_AUGMENTS && TACTICAL_AUGMENTS.length > 0) {
+      const pool = TACTICAL_AUGMENTS.filter((a) => !this.activeAugments?.includes(a.id));
+      const candidates = pool.length >= 3 ? pool : TACTICAL_AUGMENTS;
+      const shuffled = [...candidates].sort(() => 0.5 - Math.random());
+      const options = shuffled.slice(0, 3);
+      this.bus.emit('augment:offered', { options, clearedWave });
+    }
+
     // Pause between waves in LOBBY state so the player gets a breather & can buy upgrades
     this.gameState = 'LOBBY';
     this.intermissionLockTimer = 0.55;
@@ -401,6 +491,11 @@ export class GameEngine {
     });
 
     this.setupCurrentWave();
+    this.activeAugments = [];
+    this.recalcMaxHull();
+    this.hull = this.maxHull;
+    this.bus.emit('augment:updated', this.activeAugments);
+    this.bus.emit('hull:updated', { hull: this.hull, maxHull: this.maxHull });
     this.bus.emit('run:lobby');
   }
 
@@ -474,6 +569,11 @@ export class GameEngine {
     this.floatingTexts = [];
 
     this.setupCurrentWave();
+    this.activeAugments = [];
+    this.recalcMaxHull();
+    this.hull = this.maxHull;
+    this.bus.emit('augment:updated', this.activeAugments);
+    this.bus.emit('hull:updated', { hull: this.hull, maxHull: this.maxHull });
     this.bus.emit('run:lobby');
     this.bus.emit('combo:updated', { count: 0, multiplier: 1 });
     this.bus.emit('ultimate:updated', this.ultimateCharge);

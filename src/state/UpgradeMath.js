@@ -68,3 +68,35 @@ export function calculateOfflineEarnings(elapsedSeconds, offlineLevel = 1) {
   const minutesAway = Math.min(cfg.maxOfflineMinutes, elapsedSeconds / 60);
   return Math.floor(minutesAway * getOfflineCoinsPerMinute(offlineLevel));
 }
+
+export function getNextUpgradeMilestone(type, currentLevel = 1) {
+  const milestones = {
+    fireRate: [
+      { level: 4, label: 'Lv.4: 2 Barrels' },
+      { level: 9, label: 'Lv.9: 3 Barrels' },
+      { level: 15, label: 'Lv.15: 4 Barrels' },
+      { level: 25, label: 'Lv.25: Auto-Laser' },
+    ],
+    firePower: [
+      { level: 10, label: 'Lv.10: +45% Exec' },
+      { level: 20, label: 'Lv.20: AoE Blast' },
+      { level: 30, label: 'Lv.30: 2x vs Armor' },
+    ],
+    coinValue: [
+      { level: 10, label: 'Lv.10: +Geodes' },
+      { level: 20, label: 'Lv.20: 2x Boss 🪙' },
+      { level: 30, label: 'Lv.30: +Magnet' },
+    ],
+    offlineEarnings: [
+      { level: 10, label: 'Lv.10: +1 Hull 🛡️' },
+      { level: 20, label: 'Lv.20: +25% Power' },
+    ],
+  };
+
+  const list = milestones[type] || [];
+  const next = list.find((m) => currentLevel < m.level);
+  if (next) {
+    return { level: next.level, isMax: false, unlockedAll: false, text: `🎯 ${next.label}` };
+  }
+  return { level: null, isMax: true, unlockedAll: true, text: '✨ MAX PERKS' };
+}

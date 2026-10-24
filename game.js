@@ -482,6 +482,70 @@
     },
   ];
 
+  // --- Module: src/config/augments.js ---
+  /**
+   * Tactical Run Augments Catalog ("Choose 1 of 3" on Boss Wave Clears)
+   * Stackable session perks that give every run distinct build variety and synergy.
+   */
+  const TACTICAL_AUGMENTS = [
+    {
+      id: 'chainVolt',
+      icon: '🌩️',
+      name: 'Chain Volt',
+      desc: 'Critical hits zap a nearby boulder for 75% lightning DMG',
+      color: '#48dbfb',
+    },
+    {
+      id: 'wallRicochet',
+      icon: '🔱',
+      name: 'Bank Shot',
+      desc: 'All cannon shots bounce off arena walls (+1 Ricochet)',
+      color: '#ff9f1a',
+    },
+    {
+      id: 'permafrost',
+      icon: '❄️',
+      name: 'Permafrost Aura',
+      desc: 'Every boulder spawns chilled for 2.5s (+25% Shatter DMG)',
+      color: '#7ed6df',
+    },
+    {
+      id: 'shrapnelCore',
+      icon: '💥',
+      name: 'Shrapnel Core',
+      desc: 'Crushed boulders fire 2 upward shrapnel bolts into the sky',
+      color: '#ff4757',
+    },
+    {
+      id: 'deadeyeCrit',
+      icon: '🎯',
+      name: 'Deadeye Optics',
+      desc: '+15% Critical Hit Chance & +0.4x Critical Damage',
+      color: '#ff6b81',
+    },
+    {
+      id: 'hyperLoader',
+      icon: '⚡',
+      name: 'Hyper Loader',
+      desc: '+25% Cannon Fire Rate for all weapons',
+      color: '#00d2d3',
+    },
+    {
+      id: 'aegisPlating',
+      icon: '🛡️',
+      name: 'Aegis Hull +1',
+      desc: 'Permanently adds +1 Hull Shield slot & repairs all shields',
+      color: '#2ed573',
+    },
+    {
+      id: 'midasTouch',
+      icon: '💰',
+      name: 'Midas Bounty',
+      desc: '+35% Coin Value & +8% Power-Up Orb drop chance',
+      color: '#ffcf33',
+    },
+  ];
+
   // --- Module: src/config/powerups.js ---
   /**
    * Power-up Drops Metadata, Short Orb Tags, HUD Descriptions & Durations (8 Power-Up Types)
@@ -609,6 +673,26 @@
       abilityInterval: 2.5,
       healRadius: 170,
       healFraction: 0.1,
+    },
+    tntBarrel: {
+      id: 'tntBarrel',
+      badge: '🧨',
+      minWave: 2,
+      hpMultiplier: 0.52,
+      bounceMultiplier: 1.08,
+      speedMultiplier: 0.9,
+      strokeColor: '#ff4757',
+      abilityInterval: 0,
+    },
+    goldGeode: {
+      id: 'goldGeode',
+      badge: '💎',
+      minWave: 2,
+      hpMultiplier: 0.65,
+      bounceMultiplier: 1.06,
+      speedMultiplier: 0.95,
+      strokeColor: '#ffcf33',
+      abilityInterval: 0,
     },
     boss: {
       id: 'boss',
@@ -859,6 +943,37 @@
     if (elapsedSeconds < cfg.minOfflineSeconds) return 0;
     const minutesAway = Math.min(cfg.maxOfflineMinutes, elapsedSeconds / 60);
     return Math.floor(minutesAway * getOfflineCoinsPerMinute(offlineLevel));
+  }
+  function getNextUpgradeMilestone(type, currentLevel = 1) {
+    const milestones = {
+      fireRate: [
+        { level: 4, label: 'Lv.4: 2 Barrels' },
+        { level: 9, label: 'Lv.9: 3 Barrels' },
+        { level: 15, label: 'Lv.15: 4 Barrels' },
+        { level: 25, label: 'Lv.25: Auto-Laser' },
+      ],
+      firePower: [
+        { level: 10, label: 'Lv.10: +45% Exec' },
+        { level: 20, label: 'Lv.20: AoE Blast' },
+        { level: 30, label: 'Lv.30: 2x vs Armor' },
+      ],
+      coinValue: [
+        { level: 10, label: 'Lv.10: +Geodes' },
+        { level: 20, label: 'Lv.20: 2x Boss 🪙' },
+        { level: 30, label: 'Lv.30: +Magnet' },
+      ],
+      offlineEarnings: [
+        { level: 10, label: 'Lv.10: +1 Hull 🛡️' },
+        { level: 20, label: 'Lv.20: +25% Power' },
+      ],
+    };
+  
+    const list = milestones[type] || [];
+    const next = list.find((m) => currentLevel < m.level);
+    if (next) {
+      return { level: next.level, isMax: false, unlockedAll: false, text: `🎯 ${next.label}` };
+    }
+    return { level: null, isMax: true, unlockedAll: true, text: '✨ MAX PERKS' };
   }
 
   // --- Module: src/state/SaveManager.js ---
@@ -1155,6 +1270,17 @@
     // Each boulder gets its own natural bounciness (0.92x to 1.16x) so rocks don't bounce in lockstep
     const bounceFactor = 0.92 + Math.random() * 0.24;
   
+    // Pre-build 3 jagged fracture crack paths for progressive damage visualization
+    const cracks = [0, 1, 2].map((cIdx) => {
+      const vTarget = vertices[(cIdx * 2 + 1) % vertices.length];
+      return {
+        midX: vTarget.x * 0.45 + (Math.sin(cIdx * 3.1) * radius * 0.16),
+        midY: vTarget.y * 0.45 + (Math.cos(cIdx * 2.3) * radius * 0.16),
+        endX: vTarget.x * 0.92,
+        endY: vTarget.y * 0.92,
+      };
+    });
+  
     return {
       x,
       y,
@@ -1171,6 +1297,9 @@
       armorBroken: variant !== 'armored',
       abilityTimer: varCfg.abilityInterval || 0,
       bossShieldTimer: 0,
+      chillTimer: 0,
+      crackStage: 0,
+      cracks,
       angle: Math.random() * Math.PI * 2,
       vAngle: (vx > 0 ? 1 : -1) * (variant === 'fast' ? 2.4 : 0.8 + Math.random() * 1.2),
       hitScale: fromSplit ? 1.22 : 1,
@@ -1188,9 +1317,11 @@
     if (isMilestone) return 'milestoneBoss';
     if (isBoss) return 'boss';
     const roll = rng();
-    if (waveNum >= 4 && roll < 0.16) return 'healer';
-    if (waveNum >= 3 && roll < 0.34) return 'fast';
-    if (waveNum >= 2 && roll < 0.52) return 'armored';
+    if (waveNum >= 2 && roll < 0.09) return 'tntBarrel';
+    if (waveNum >= 2 && roll < 0.17) return 'goldGeode';
+    if (waveNum >= 4 && roll < 0.28) return 'healer';
+    if (waveNum >= 3 && roll < 0.44) return 'fast';
+    if (waveNum >= 2 && roll < 0.60) return 'armored';
     return 'normal';
   }
   function calculateWaveTotalHP(rockQueue) {
@@ -1279,10 +1410,15 @@
           }
   
           const variant = pickRockVariant(waveNum, isBoss, isBoss && isMilestoneWave, rng);
+          if (variant === 'tntBarrel' || variant === 'goldGeode') {
+            size = 1;
+          }
           let sizeMult = size === 3 ? 2.2 : size === 2 ? 1.2 : 0.6;
           if (variant === 'milestoneBoss') sizeMult = 4.2;
           else if (variant === 'boss') sizeMult = 2.8;
           else if (variant === 'fast') sizeMult *= 0.78;
+          else if (variant === 'tntBarrel') sizeMult = 0.75;
+          else if (variant === 'goldGeode') sizeMult = 0.85;
   
           const hp = Math.max(1, Math.round(baseHP * sizeMult * (0.85 + rng() * 0.3)));
   
@@ -1626,7 +1762,7 @@
               const sawDmg = Math.max(2, Math.round(engine.getBulletDamage() * 4.5));
               combatSystem.applyDamageToRock(r, sawDmg, engine, { isCrit: true });
             } else {
-              engine.triggerGameOver(r);
+              engine.takeHullDamage(r);
               break;
             }
           }
@@ -1786,6 +1922,7 @@
       const isPierce = activePowerups.piercingLaser > 0;
       const isExplosive = activePowerups.explosiveRounds > 0;
       const isSpreadPowerup = activePowerups.spreadShot > 0;
+      const hasBankShot = engine.activeAugments && engine.activeAugments.includes('wallRicochet');
   
       const speed =
         variety.id === 'railgun'
@@ -1798,6 +1935,26 @@
       const splashRadius = isExplosive ? 95 : variety.splashRadius || 0;
       const dmgRatio = (variety.damageMult || 1) * (isGiant ? 2.0 : 1.0);
       const bulletRadius = isGiant ? 11.5 : variety.id === 'railgun' ? 7 : isOverdrive ? 6 : 5.5;
+  
+      // Hyper-Lance Perk (Fire Rate Lv. 25+): Every 12th volley fires a free piercing cyan Laser Lance!
+      engine.volleyCount = (engine.volleyCount || 0) + 1;
+      if (!isPierce && saveManager.state.upgrades.fireRate >= 25 && engine.volleyCount % 12 === 0) {
+        engine.laserBeams.push({
+          x: cannon.x,
+          y: cannon.y - 48,
+          width: 14,
+          color: '#00d2d3',
+          life: 0.8,
+        });
+        const lanceDmg = Math.max(1, Math.round(engine.getBulletDamage() * 1.6));
+        for (let j = engine.rocks.length - 1; j >= 0; j--) {
+          const r = engine.rocks[j];
+          if (r && Math.abs(r.x - cannon.x) <= r.radius + 14) {
+            engine.addParticles(cannon.x, r.y + r.radius * 0.4, '#00d2d3', 4, 140);
+            this.applyDamageToRock(r, lanceDmg, engine, { isCrit: false, isLaser: true });
+          }
+        }
+      }
   
       // Determine distinct projectile shape so every power-up looks and feels unique
       const bulletShape = isGiant
@@ -1856,7 +2013,7 @@
             radius: bulletRadius,
             shape: bulletShape,
             spinAngle: 0,
-            bouncesLeft: isSpreadPowerup ? 2 : 0,
+            bouncesLeft: isSpreadPowerup ? 2 : hasBankShot ? 1 : 0,
             overdrive: isOverdrive,
             isGiant,
             isPierce: pierceLeft > 0,
@@ -1961,6 +2118,7 @@
     }
   
     applyDamageToRock(r, rawDmg, engine, { isCrit = false, isZap = false } = {}) {
+      if (!r || r.destroyed || r.hp <= 0) return 0;
       const { rocks, saveManager, waveSystem } = engine;
       const save = saveManager.state;
       const idx = rocks.indexOf(r);
@@ -1975,11 +2133,30 @@
       const frostMult = isFrozen ? 1.25 : 1.0;
       const hasIntactArmor = r.variant === 'armored' && !r.armorBroken;
       const armorScale = ROCK_VARIANTS.armored.armorDamageScale;
-      const boostedDmg = Math.max(1, Math.round(rawDmg * frostMult));
+      let boostedDmg = Math.max(1, Math.round(rawDmg * frostMult));
+  
+      // Executioner Perk (Fire Power Lv. 10+): +45% damage to low HP rocks (<35% HP)
+      if (save.upgrades.firePower >= 10 && r.hp <= r.maxHp * 0.35) {
+        boostedDmg = Math.round(boostedDmg * 1.45);
+      }
+  
       const afterArmor = hasIntactArmor ? Math.max(1, Math.round(boostedDmg * armorScale)) : boostedDmg;
       const actualDmg = Math.min(r.hp, afterArmor);
   
       r.hp -= actualDmg;
+  
+      // Progressive Fracture Cracks & Debris Shedding
+      const col = getRockColorTier(r.maxHp);
+      const hpRatio = r.hp / r.maxHp;
+      if (r.crackStage === 0 && hpRatio <= 0.65) {
+        r.crackStage = 1;
+        r.hitScale = 1.25;
+        engine.addParticles(r.x, r.y, col.dark, 6, 140);
+      } else if (r.crackStage === 1 && hpRatio <= 0.30) {
+        r.crackStage = 2;
+        r.hitScale = 1.32;
+        engine.addParticles(r.x, r.y, col.fill, 9, 175);
+      }
   
       engine.comboCount += 1;
       engine.comboTimer = COMBAT.COMBO_DECAY_TIME;
@@ -1994,6 +2171,22 @@
   
       if (isCrit) {
         engine.addFloatingText(r.x, r.y - 12, `💥 ${formatNum(actualDmg)}!`, '#ff4757', 14);
+  
+        // Chain Volt Augment: Crits zap another boulder for 75% lightning damage
+        if (engine.activeAugments && engine.activeAugments.includes('chainVolt') && rocks.length > 1) {
+          const otherTarget = rocks.find((other) => other !== r && !other.destroyed && other.hp > 0);
+          if (otherTarget) {
+            const voltDmg = Math.max(1, Math.round(actualDmg * 0.75));
+            engine.laserBeams.push({
+              x: otherTarget.x,
+              y: otherTarget.y,
+              width: 8,
+              color: '#48dbfb',
+              life: 0.2,
+            });
+            this.applyDamageToRock(otherTarget, voltDmg, engine, { isCrit: false, isZap: true });
+          }
+        }
       } else if (isZap) {
         engine.addFloatingText(r.x, r.y - 10, `⚡ ${formatNum(actualDmg)}`, '#48dbfb', 13);
       }
@@ -2040,11 +2233,16 @@
       const variety = saveManager.getActiveCannon();
       const addon = saveManager.getActiveAddon();
   
+      const hasDeadeye = engine.activeAugments && engine.activeAugments.includes('deadeyeCrit');
       const critChance =
         COMBAT.CRIT_CHANCE +
         (variety.critBonus || 0) +
-        (addon.id === 'laserSight' ? 0.18 : 0);
-      const critMult = COMBAT.CRIT_MULTIPLIER + (addon.id === 'laserSight' ? 0.5 : 0);
+        (addon.id === 'laserSight' ? 0.18 : 0) +
+        (hasDeadeye ? 0.15 : 0);
+      const critMult =
+        COMBAT.CRIT_MULTIPLIER +
+        (addon.id === 'laserSight' ? 0.5 : 0) +
+        (hasDeadeye ? 0.4 : 0);
   
       for (let i = bullets.length - 1; i >= 0; i--) {
         const b = bullets[i];
@@ -2124,7 +2322,7 @@
               const splashDmg = Math.max(1, Math.round(scaledDmg * 0.5));
               for (let k = rocks.length - 1; k >= 0; k--) {
                 const other = rocks[k];
-                if (!other || other === r) continue;
+                if (!other || other === r || other.destroyed || other.hp <= 0) continue;
                 const d = Math.hypot(other.x - b.x, other.y - b.y);
                 if (d <= b.splashRadius + other.radius) {
                   this.applyDamageToRock(other, splashDmg, engine, { isCrit: false });
@@ -2176,9 +2374,18 @@
     }
   
     destroyRock(rock, index, engine, fromUltimate = false) {
+      if (!rock || rock.destroyed) return;
+      rock.destroyed = true;
+  
       const { rocks, saveManager, waveSystem, achievementTracker } = engine;
       const save = saveManager.state;
       const col = getRockColorTier(rock.maxHp);
+  
+      // Eagerly remove from active rocks array so cascading AoE and splash logic never re-target this rock
+      const currentIdx = rocks.indexOf(rock);
+      if (currentIdx !== -1) {
+        rocks.splice(currentIdx, 1);
+      }
   
       engine.addParticles(rock.x, rock.y, col.fill, rock.size * 8, 220);
       this.bus.emit('rock:destroyed', { size: rock.size, isBoss: rock.isBoss });
@@ -2189,17 +2396,93 @@
       }
   
       save.stats.rocksDestroyed += 1;
-      if (rock.isBoss) {
-        save.stats.bossesDefeated += 1;
-        engine.maybeSpawnPowerup(rock.x, rock.y, true);
-        engine.spawnCoinBurst(rock.x, rock.y, rock.isMilestone ? 12 : 6);
-      } else if (rock.size === 1) {
-        engine.maybeSpawnPowerup(rock.x, rock.y, false);
+  
+      // Shatter Blast Perk (Fire Power Lv. 20+): 25% AoE splash to nearby boulders on kill
+      if (save.upgrades.firePower >= 20) {
+        const shatterDmg = Math.max(1, Math.round(engine.getBulletDamage() * 0.25));
+        engine.addShockwave(rock.x, rock.y, 80, 'rgba(255, 159, 26, 0.6)');
+        for (let k = rocks.length - 1; k >= 0; k--) {
+          const other = rocks[k];
+          if (
+            other &&
+            other !== rock &&
+            !other.destroyed &&
+            other.hp > 0 &&
+            Math.hypot(other.x - rock.x, other.y - rock.y) <= 80 + other.radius
+          ) {
+            this.applyDamageToRock(other, shatterDmg, engine, { isCrit: false });
+          }
+        }
       }
   
-      rocks.splice(index, 1);
+      // Shrapnel Core Augment: fire 2 upward shrapnel bolts into the sky
+      if (engine.activeAugments && engine.activeAugments.includes('shrapnelCore')) {
+        for (const ang of [-0.4, 0.4]) {
+          engine.bullets.push(
+            engine.bulletPool.acquire({
+              x: rock.x,
+              y: rock.y,
+              vx: Math.sin(ang) * 540,
+              vy: -Math.cos(ang) * 540,
+              radius: 4.5,
+              shape: 'shrapnel',
+              spinAngle: 0,
+              bouncesLeft: 0,
+              overdrive: false,
+              isGiant: false,
+              isPierce: false,
+              pierceLeft: 0,
+              splashRadius: 0,
+              spawnClusters: false,
+              lastHitRock: rock,
+              isDrone: false,
+              damageRatio: 0.5,
+            })
+          );
+        }
+      }
   
-      if (rock.size > 1) {
+      if (rock.variant === 'tntBarrel') {
+        // 🧨 Volatile TNT Barrel: Massive 180px chain explosion!
+        engine.triggerShake(14, 0.35);
+        engine.addShockwave(rock.x, rock.y, 180, 'rgba(255, 71, 87, 0.9)');
+        engine.addParticles(rock.x, rock.y, '#ff4757', 22, 280);
+        engine.addFloatingText(rock.x, rock.y - 18, '🧨 KABOOM!', '#ff4757', 18);
+        const tntDamage = Math.max(15, Math.round(engine.getBulletDamage() * 10));
+        for (let k = rocks.length - 1; k >= 0; k--) {
+          const other = rocks[k];
+          if (
+            other &&
+            other !== rock &&
+            !other.destroyed &&
+            other.hp > 0 &&
+            Math.hypot(other.x - rock.x, other.y - rock.y) <= 180 + other.radius
+          ) {
+            this.applyDamageToRock(other, tntDamage, engine, { isCrit: true });
+          }
+        }
+        engine.spawnCoinBurst(rock.x, rock.y, 4);
+      } else if (rock.variant === 'goldGeode') {
+        // 💎 Golden Geode: Jackpot of 8 coins + guaranteed Power-Up!
+        engine.triggerShake(8, 0.2);
+        engine.addShockwave(rock.x, rock.y, 120, 'rgba(255, 207, 51, 0.85)');
+        engine.addParticles(rock.x, rock.y, '#ffcf33', 18, 220);
+        engine.addFloatingText(rock.x, rock.y - 18, '💎 JACKPOT GEODE!', '#ffcf33', 16);
+        engine.maybeSpawnPowerup(rock.x, rock.y, true);
+        engine.spawnCoinBurst(rock.x, rock.y, 8);
+      } else if (rock.isBoss) {
+        save.stats.bossesDefeated += 1;
+        engine.maybeSpawnPowerup(rock.x, rock.y, true);
+        const coinCount = rock.isMilestone ? 14 : 7;
+        // Boss Bounty perk (Coin Value Lv. 20+): 2x coins
+        const bountyMult = save.upgrades.coinValue >= 20 ? 2 : 1;
+        engine.spawnCoinBurst(rock.x, rock.y, coinCount * bountyMult);
+      } else if (rock.size === 1) {
+        const dropBonus = engine.activeAugments?.includes('midasTouch') ? 0.08 : 0;
+        engine.maybeSpawnPowerup(rock.x, rock.y, false, dropBonus);
+      }
+  
+      if (rock.size > 1 && rock.variant !== 'tntBarrel' && rock.variant !== 'goldGeode') {
         const childSize = rock.size - 1;
         const childHp = Math.max(1, Math.floor(rock.maxHp * 0.5));
         const spreadVx = (rock.variant === 'fast' ? 115 : 80) + Math.random() * 35;
@@ -2347,6 +2630,12 @@
       this.ultimateBeamTimer = 0;
       this.deathSlowMoTimer = 0;
   
+      // 3-Segment Hull Shield Integrity & Run Augments
+      this.maxHull = 3;
+      this.hull = 3;
+      this.activeAugments = [];
+      this.recalcMaxHull();
+  
       this.activePowerups = {
         rapidFire: 0,
         spreadShot: 0,
@@ -2419,13 +2708,25 @@
     }
   
     // --- Computed Stats ---
+    recalcMaxHull() {
+      let max = 3;
+      if (this.saveManager?.state?.upgrades?.offlineEarnings >= 10) max += 1;
+      if (this.activeAugments && this.activeAugments.includes('aegisPlating')) max += 1;
+      this.maxHull = max;
+      this.hull = Math.min(this.hull || max, max);
+      if (this.bus) {
+        this.bus.emit('hull:updated', { hull: this.hull, maxHull: this.maxHull });
+      }
+    }
+  
     getFireRateShotsPerSec() {
       const variety = this.saveManager.getActiveCannon();
       const base = getFireRateShotsPerSec(
         this.saveManager.state.upgrades.fireRate,
         this.activePowerups.rapidFire > 0
       );
-      return base * (variety.fireRateMult || 1);
+      const augMult = this.activeAugments?.includes('hyperLoader') ? 1.25 : 1.0;
+      return base * (variety.fireRateMult || 1) * augMult;
     }
   
     getBarrelCount() {
@@ -2444,11 +2745,13 @@
     }
   
     getCoinMultiplier() {
-      return getCoinMultiplier(
+      const base = getCoinMultiplier(
         this.saveManager.state.upgrades.coinValue,
         this.activePowerups.magnet > 0,
         this.gameMode === 'BOSS_RUSH'
       );
+      const augMult = this.activeAugments?.includes('midasTouch') ? 1.35 : 1.0;
+      return base * augMult;
     }
   
     isBossRushUnlocked() {
@@ -2472,6 +2775,11 @@
       save.wave = nextWave;
       this.saveManager.persist();
       this.setupCurrentWave();
+      this.activeAugments = [];
+      this.recalcMaxHull();
+      this.hull = this.maxHull;
+      this.bus.emit('augment:updated', this.activeAugments);
+      this.bus.emit('hull:updated', { hull: this.hull, maxHull: this.maxHull });
       this.bus.emit('run:lobby');
       return true;
     }
@@ -2555,7 +2863,8 @@
     activatePowerup(type, x, y) {
       const meta = POWERUP_META[type];
       if (!meta) return;
-      this.activePowerups[type] = meta.duration;
+      const durBonus = this.saveManager.state.upgrades.offlineEarnings >= 20 ? 1.25 : 1.0;
+      this.activePowerups[type] = meta.duration * durBonus;
       this.saveManager.state.stats.powerupsCollected += 1;
       this.bus.emit('powerup:collected', { type, meta });
       this.addParticles(x, y, meta.color, 18, 220);
@@ -2569,6 +2878,51 @@
       this.achievementTracker.checkUnlockables();
       this.saveManager.persist();
       this.bus.emit('powerup:updated', this.activePowerups);
+    }
+  
+    takeHullDamage(rock) {
+      if (this.invulnerableTimer > 0 || this.activePowerups.shield > 0) return;
+      if (rock.variant === 'tntBarrel' || rock.variant === 'goldGeode') {
+        rock.vy = -450;
+        return;
+      }
+  
+      const dmg = rock.isBoss ? 2 : 1;
+      this.hull = Math.max(0, this.hull - dmg);
+      this.bus.emit('hull:updated', { hull: this.hull, maxHull: this.maxHull });
+  
+      if (this.hull > 0) {
+        this.invulnerableTimer = 1.35;
+        rock.vy = -510;
+        rock.y = Math.min(rock.y, this.cannon.y - 45);
+        this.triggerShake(9, 0.22);
+        this.addShockwave(this.cannon.x, this.cannon.y - 24, 90, '#ff4757');
+        this.addFloatingText(
+          this.cannon.x,
+          this.cannon.y - 44,
+          `⚠️ HULL HIT! ${this.hull}/${this.maxHull} SHIELDS`,
+          '#ff4757',
+          14
+        );
+        this.bus.emit('sfx:hit', { hpRatio: 0.1, armored: true });
+      } else {
+        this.triggerGameOver(rock);
+      }
+    }
+  
+    activateAugment(augmentId) {
+      if (!this.activeAugments) this.activeAugments = [];
+      if (!this.activeAugments.includes(augmentId)) {
+        this.activeAugments.push(augmentId);
+      }
+      if (augmentId === 'aegisPlating') {
+        this.recalcMaxHull();
+        this.hull = this.maxHull;
+      } else {
+        this.hull = Math.min(this.maxHull, this.hull + 1);
+      }
+      this.bus.emit('hull:updated', { hull: this.hull, maxHull: this.maxHull });
+      this.bus.emit('augment:updated', this.activeAugments);
     }
   
     spawnCoinBurst(x, y, count = 3) {
@@ -2640,6 +2994,9 @@
       this.gameState = 'PLAYING';
       this.saveManager.state.stats.runsPlayed += 1;
       this.saveManager.persist();
+      this.recalcMaxHull();
+      this.hull = this.maxHull;
+      this.bus.emit('hull:updated', { hull: this.hull, maxHull: this.maxHull });
       this.setupCurrentWave();
       this.bus.emit('run:started');
       this.bus.emit('ultimate:updated', this.ultimateCharge);
@@ -2690,6 +3047,21 @@
       }
       this.awardCoins(waveBonus);
   
+      // Full Hull repair between waves
+      this.recalcMaxHull();
+      this.hull = this.maxHull;
+      this.bus.emit('hull:updated', { hull: this.hull, maxHull: this.maxHull });
+  
+      // Boss Wave Cleared (every 3 waves or in Boss Rush): Offer 3 Tactical Augments
+      const isBossCleared = clearedWave % 3 === 0 || this.gameMode === 'BOSS_RUSH';
+      if (isBossCleared && TACTICAL_AUGMENTS && TACTICAL_AUGMENTS.length > 0) {
+        const pool = TACTICAL_AUGMENTS.filter((a) => !this.activeAugments?.includes(a.id));
+        const candidates = pool.length >= 3 ? pool : TACTICAL_AUGMENTS;
+        const shuffled = [...candidates].sort(() => 0.5 - Math.random());
+        const options = shuffled.slice(0, 3);
+        this.bus.emit('augment:offered', { options, clearedWave });
+      }
+  
       // Pause between waves in LOBBY state so the player gets a breather & can buy upgrades
       this.gameState = 'LOBBY';
       this.intermissionLockTimer = 0.55;
@@ -2702,6 +3074,11 @@
       });
   
       this.setupCurrentWave();
+      this.activeAugments = [];
+      this.recalcMaxHull();
+      this.hull = this.maxHull;
+      this.bus.emit('augment:updated', this.activeAugments);
+      this.bus.emit('hull:updated', { hull: this.hull, maxHull: this.maxHull });
       this.bus.emit('run:lobby');
     }
   
@@ -2775,6 +3152,11 @@
       this.floatingTexts = [];
   
       this.setupCurrentWave();
+      this.activeAugments = [];
+      this.recalcMaxHull();
+      this.hull = this.maxHull;
+      this.bus.emit('augment:updated', this.activeAugments);
+      this.bus.emit('hull:updated', { hull: this.hull, maxHull: this.maxHull });
       this.bus.emit('run:lobby');
       this.bus.emit('combo:updated', { count: 0, multiplier: 1 });
       this.bus.emit('ultimate:updated', this.ultimateCharge);
@@ -3389,9 +3771,34 @@
       ctx.closePath();
       ctx.fillStyle = r.hitFlash > 0 ? 'rgba(255,255,255,0.6)' : col.dark;
       ctx.fill();
+  
+      // Progressive Internal Fracture Cracks (Appear below 65% HP, glow hot below 30% HP)
+      if (r.cracks && r.crackStage >= 1) {
+        const count = r.crackStage >= 2 ? r.cracks.length : 2;
+        ctx.save();
+        ctx.strokeStyle = r.crackStage >= 2 ? '#ffda79' : 'rgba(0, 0, 0, 0.6)';
+        ctx.lineWidth = r.crackStage >= 2 ? 2.5 : 1.8;
+        ctx.beginPath();
+        for (let c = 0; c < count; c++) {
+          const ck = r.cracks[c];
+          ctx.moveTo(0, 0);
+          ctx.lineTo(ck.midX, ck.midY);
+          ctx.lineTo(ck.endX, ck.endY);
+        }
+        ctx.stroke();
+        ctx.restore();
+      }
       ctx.restore();
   
-      if (r.isMilestone) {
+      if (r.variant === 'tntBarrel') {
+        ctx.font = '15px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('🧨', 0, -r.radius - 8);
+      } else if (r.variant === 'goldGeode') {
+        ctx.font = '15px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('💎', 0, -r.radius - 8);
+      } else if (r.isMilestone) {
         ctx.font = '21px sans-serif';
         ctx.textAlign = 'center';
         ctx.fillText('👑', 0, -r.radius - 10);
@@ -4035,6 +4442,8 @@
       this.bossHudLabelEl = document.getElementById('boss-hud-label');
       this.bossBarFillEl = document.getElementById('boss-bar-fill');
       this.powerupHudEl = document.getElementById('powerup-hud');
+      this.hullHudEl = document.getElementById('hull-hud');
+      this.augmentHudEl = document.getElementById('augment-hud');
       this.achToastEl = document.getElementById('achievement-toast');
       this.achToastIconEl = document.getElementById('ach-toast-icon');
       this.achToastLabelEl = document.getElementById('ach-toast-label');
@@ -4092,6 +4501,14 @@
         this.updatePowerupHUD(activePowerups);
       });
   
+      this.bus.on('hull:updated', ({ hull, maxHull }) => {
+        this.updateHullHUD(hull, maxHull);
+      });
+  
+      this.bus.on('augment:updated', (activeAugments) => {
+        this.updateAugmentHUD(activeAugments);
+      });
+  
       this.bus.on('combo:updated', ({ count, multiplier }) => {
         if (!this.comboPillEl) return;
         if (count >= 5) {
@@ -4130,6 +4547,8 @@
         this.lobbyModeWrapEl?.classList.add('hidden');
         this.upgradePanelEl.classList.add('hidden');
         this.pauseBtn?.classList.remove('hidden');
+        this.hullHudEl?.classList.remove('hidden');
+        this.augmentHudEl?.classList.remove('hidden');
       });
   
       this.bus.on('run:resumed', () => {
@@ -4139,6 +4558,8 @@
       this.bus.on('run:gameover', () => {
         this.pauseBtn?.classList.add('hidden');
         this.lobbyModeWrapEl?.classList.add('hidden');
+        this.hullHudEl?.classList.add('hidden');
+        this.augmentHudEl?.classList.add('hidden');
       });
   
       this.bus.on('run:lobby', () => {
@@ -4147,6 +4568,8 @@
         this.startPromptEl.classList.remove('hidden');
         this.lobbyModeWrapEl?.classList.remove('hidden');
         this.upgradePanelEl.classList.remove('hidden');
+        this.hullHudEl?.classList.add('hidden');
+        this.augmentHudEl?.classList.add('hidden');
       });
     }
   
@@ -4224,6 +4647,43 @@
         .join('');
     }
   
+    updateHullHUD(hull, maxHull) {
+      if (!this.hullHudEl) return;
+      const safeHull = Math.max(0, hull ?? 0);
+      const safeMax = Math.max(1, maxHull ?? 3);
+      let pips = '';
+      for (let i = 0; i < safeMax; i++) {
+        const active = i < safeHull;
+        const isCritical = safeHull === 1 && active;
+        pips += `<span class="hull-pip ${active ? 'active' : 'depleted'} ${isCritical ? 'critical' : ''}" title="Hull Shield ${i + 1}/${safeMax}">🛡️</span>`;
+      }
+      this.hullHudEl.innerHTML = `
+        <div class="hull-badge">
+          <span class="hull-label">HULL</span>
+          <div class="hull-pips">${pips}</div>
+        </div>
+      `;
+    }
+  
+    updateAugmentHUD(activeAugments) {
+      if (!this.augmentHudEl) return;
+      if (!activeAugments || activeAugments.length === 0) {
+        this.augmentHudEl.innerHTML = '';
+        return;
+      }
+      const map = new Map(TACTICAL_AUGMENTS.map((a) => [a.id, a]));
+      this.augmentHudEl.innerHTML = activeAugments
+        .map((id) => {
+          const aug = map.get(id);
+          if (!aug) return '';
+          return `<div class="aug-chip" title="${aug.name}: ${aug.desc || aug.description}" style="border-color:${aug.color || '#48dbfb'}">
+            <span class="aug-chip-icon">${aug.icon}</span>
+            <span class="aug-chip-name">${aug.name}</span>
+          </div>`;
+        })
+        .join('');
+    }
+  
     showWaveBanner(title, sub, isBossAlert = false) {
       this.waveBannerTextEl.textContent = title;
       this.waveBannerBonusEl.textContent = sub;
@@ -4295,6 +4755,8 @@
       this.statsModalEl = document.getElementById('stats-modal');
       this.settingsModalEl = document.getElementById('settings-modal');
       this.disclaimerModalEl = document.getElementById('disclaimer-modal');
+      this.augmentModalEl = document.getElementById('augment-modal');
+      this.augmentCardListEl = document.getElementById('augment-card-list');
   
       this.skinsBtn = document.getElementById('skins-btn');
       this.statsBtn = document.getElementById('stats-btn');
@@ -4324,6 +4786,7 @@
         !this.skinsModalEl.classList.contains('hidden') ||
         !this.statsModalEl.classList.contains('hidden') ||
         !this.settingsModalEl.classList.contains('hidden') ||
+        (this.augmentModalEl && !this.augmentModalEl.classList.contains('hidden')) ||
         (this.disclaimerModalEl && !this.disclaimerModalEl.classList.contains('hidden'))
       );
     }
@@ -4363,6 +4826,12 @@
   
       this.bus.on('run:revived', () => {
         this.gameoverModalEl.classList.add('hidden');
+      });
+  
+      this.bus.on('augment:offered', ({ options }) => {
+        this.inputSystem?.reset();
+        this.renderAugmentOptions(options);
+        this.augmentModalEl?.classList.remove('hidden');
       });
   
       // Upgrade Card Clicks & Press-and-Hold Auto-Upgrade
@@ -4567,6 +5036,13 @@
           statEl.textContent = `${Math.round(getBaseCoinMultiplier(lvl) * 100)}%`;
         } else if (type === 'offlineEarnings') {
           statEl.textContent = `${formatNum(getOfflineCoinsPerMinute(lvl))}/m`;
+        }
+  
+        const perkEl = document.getElementById(`perk-${type}`);
+        if (perkEl) {
+          const milestone = getNextUpgradeMilestone(type, lvl);
+          perkEl.textContent = milestone.text;
+          perkEl.classList.toggle('maxed', milestone.isMax);
         }
   
         if (save.coins >= cost) {
@@ -4813,6 +5289,35 @@
       }
       this.engine.saveManager.persist();
     }
+  
+    renderAugmentOptions(options) {
+      if (!this.augmentCardListEl) return;
+      this.augmentCardListEl.innerHTML = options
+        .map(
+          (aug) => `
+          <div class="augment-card" data-augment-id="${aug.id}" style="--aug-accent: ${aug.color || '#ffcf33'}">
+            <div class="augment-card-header">
+              <span class="augment-card-icon">${aug.icon}</span>
+              <span class="augment-card-badge">TACTICAL AUGMENT</span>
+            </div>
+            <div class="augment-card-title">${aug.name}</div>
+            <div class="augment-card-desc">${aug.desc || aug.description}</div>
+            <button type="button" class="action-btn primary augment-select-btn">SELECT PERK</button>
+          </div>
+        `
+        )
+        .join('');
+  
+      this.augmentCardListEl.querySelectorAll('.augment-card').forEach((card) => {
+        card.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const augId = card.getAttribute('data-augment-id');
+          this.audioService.init();
+          this.engine.activateAugment(augId);
+          this.augmentModalEl?.classList.add('hidden');
+        });
+      });
+    }
   }
 
   // --- Module: src/main.js ---
@@ -4896,8 +5401,13 @@
       const dt = Math.min(0.05, (now - lastTime) / 1000);
       lastTime = now;
   
-      engine.update(dt, inputSystem, modalController.isAnyModalOpen());
-      renderer.render(now);
+      try {
+        engine.update(dt, inputSystem, modalController.isAnyModalOpen());
+        renderer.render(now);
+      } catch (err) {
+        console.error('Boulder Barrage runtime error caught:', err);
+      }
+  
       requestAnimationFrame(loop);
     }
   

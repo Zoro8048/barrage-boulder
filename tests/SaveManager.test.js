@@ -6,6 +6,8 @@ import { EventBus } from '../src/core/EventBus.js';
 import { POWERUP_META } from '../src/config/powerups.js';
 import { CANNON_VARIETIES } from '../src/config/cannons.js';
 import { CANNON_ADDONS } from '../src/config/addons.js';
+import { TACTICAL_AUGMENTS } from '../src/config/augments.js';
+import { ROCK_VARIANTS } from '../src/config/rockVariants.js';
 
 class MemoryStorage {
   constructor() {
@@ -38,10 +40,16 @@ test('SaveManager - migrates legacy v1 save data cleanly without losing progress
   assert.equal(migrated.equipped.addon, 'wingmanDrones');
 });
 
-test('Catalogs - 8 Power-Ups, 5 Cannon Varieties, and 5 Tactical Add-Ons are registered', () => {
+test('Catalogs - 8 Power-Ups, 5 Cannon Varieties, 5 Tactical Add-Ons, and 8 Augments are registered', () => {
   assert.equal(Object.keys(POWERUP_META).length, 8);
   assert.equal(CANNON_VARIETIES.length, 5);
   assert.equal(CANNON_ADDONS.length, 5);
+  assert.equal(TACTICAL_AUGMENTS.length, 8);
+  assert.ok(TACTICAL_AUGMENTS.every((a) => a.id && a.name && a.icon && a.desc));
+  assert.ok(ROCK_VARIANTS.tntBarrel);
+  assert.ok(ROCK_VARIANTS.goldGeode);
+  assert.equal(ROCK_VARIANTS.tntBarrel.badge, '🧨');
+  assert.equal(ROCK_VARIANTS.goldGeode.badge, '💎');
 });
 
 test('SaveManager & AchievementTracker - unlocks achievements and awards coins', () => {

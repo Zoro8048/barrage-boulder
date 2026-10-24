@@ -104,8 +104,9 @@ boulder-barrage/
 │   │   ├── addons.js           # 5 Unlockable Tactical Add-Ons
 │   │   ├── skins.js            # 8 Unlockable Cannon Skins catalog
 │   │   ├── themes.js           # 7 Unlockable Visual Arena Themes catalog
+│   │   ├── augments.js         # 8 Stackable Tactical Run Augments ("Choose 1 of 3" draft)
 │   │   ├── powerups.js         # 8 Distinct Power-Ups with orb tags & HUD descriptions
-│   │   ├── rockVariants.js     # Declarative rock & boss variant rules + HP color tiers
+│   │   ├── rockVariants.js     # Declarative rock, barrel & boss variant rules + HP color tiers
 │   │   └── achievements.js     # Lifetime achievements catalog & progress evaluators
 │   ├── core/                   # Engine primitives
 │   │   ├── EventBus.js         # Pub/Sub event emitter decoupling simulation from UI/Audio
@@ -114,28 +115,29 @@ boulder-barrage/
 │   │   └── utils.js            # Number formatting (formatNum) & math helpers
 │   ├── state/                  # Persistence & progression math
 │   │   ├── SaveManager.js      # LocalStorage persistence, schema migrations, offline calc
-│   │   ├── UpgradeMath.js      # Pure stat calculation functions
+│   │   ├── UpgradeMath.js      # Pure stat calculation functions & milestone perks
 │   │   └── AchievementTracker.js # Evaluates stats against achievement rules
 │   ├── entities/               # Entity models & factories
 │   │   ├── Cannon.js           # Player turret, movement smoothing, recoil & attachment slots
-│   │   └── Rock.js             # Boulder factory, procedural polygon generator, variant state
+│   │   └── Rock.js             # Boulder factory, procedural polygon generator, cracks & variant state
 │   ├── systems/                # Frame-by-frame simulation systems
 │   │   ├── WaveSystem.js       # Wave generator, split-aware HP calculator & spawn timer
 │   │   ├── PhysicsSystem.js    # Movement, gravity, wall/floor bounce, magnet pull
-│   │   ├── CombatSystem.js     # Bullet collisions, armor break, rock split, boss skills
+│   │   ├── CombatSystem.js     # Bullet collisions, armor break, rock split, boss skills, TNT/Geodes
 │   │   └── InputSystem.js      # Pointer, touch, and keyboard input normalization
 │   ├── render/                 # Graphics pipeline
-│   │   └── CanvasRenderer.js   # Modular 2D canvas drawing (sky, rocks, cannon, VFX)
+│   │   └── CanvasRenderer.js   # Modular 2D canvas drawing (fracture cracks, sky, rocks, cannon, VFX)
 │   ├── services/               # Hardware & browser capabilities
 │   │   ├── AudioService.js     # Web Audio API synth SFX + background music loop
 │   │   └── HapticsService.js   # Mobile navigator.vibrate wrapper
 │   └── ui/                     # DOM overlays & modals
-│       ├── HudController.js    # Top HUD, wave/boss bars, power-up pills, toasts
-│       └── ModalController.js  # Upgrades, Hangar/Themes, Stats, Settings, Game Over
+│       ├── HudController.js    # Top HUD, Hull shields, augment chips, wave/boss bars, toasts
+│       └── ModalController.js  # Upgrades, Augment draft, Hangar/Themes, Stats, Settings, Game Over
 └── tests/                      # Automated unit tests (node:test)
-    ├── UpgradeMath.test.js     # Tests cost curves, barrel unlocks, overdrive & offline caps
-    ├── SaveManager.test.js     # Tests v1->v2 save migrations & achievement rewards
-    └── WaveSystem.test.js      # Tests split HP accounting & boss wave scheduling
+    ├── UpgradeMath.test.js     # Tests cost curves, barrel unlocks, milestones & offline caps
+    ├── SaveManager.test.js     # Tests v1->v2 save migrations, catalogs & achievement rewards
+    ├── WaveSystem.test.js      # Tests split HP accounting & boss wave scheduling
+    └── HullAndAugments.test.js # Tests 3-segment Hull Shield integrity, invulnerability & augments
 ```
 
 ### 3. Frame Lifecycle (`src/main.js`)
@@ -247,6 +249,7 @@ Because the project uses native ES modules with relative paths (`./src/main.js`)
   - [x] Automated unit test suite (`node --test`)
 - [x] **Core Cannon, Tactical Add-Ons & Combat Systems**
   - [x] Smooth horizontal cannon movement with rotating wheels, recoil, and muzzle flash
+  - [x] **3-Segment Hull Shield Integrity (`🛡️🛡️🛡️`)**: Replaces frustrating instant-death with a 3-hit hull buffer per wave (`maxHull: 3-4`), granting a 1.35s mercy invulnerability repulse on contact and full shield repair between waves
   - [x] Underground **Thumb Trackpad Zone (`◀ DRAG THUMB HERE ▶`)** during active gameplay so mobile players never cover their cannon with their thumb
   - [x] Per-boulder randomized bounce heights and desynchronized split arcs so waves never bounce in lockstep
   - [x] Multi-barrel volley firing (unlocks 2, 3, and 4 barrels at higher Fire Rate levels)
@@ -257,12 +260,27 @@ Because the project uses native ES modules with relative paths (`./src/main.js`)
   - [x] In-game **Pause Modal (`⏸️`)** and automatic between-wave upgrade breather
 - [x] **Rocks, Special Variants & Wave Progression**
   - [x] Faceted polygon boulders with dynamic HP color tiers and smooth piecewise Wave 25+ HP & coin scaling
+  - [x] **Progressive Fracture Cracks & Rock Debris**: Render visible jagged internal stress fissures when boulders fall below 65% and 30% HP, accompanied by physical rock debris particle shedding
+  - [x] **Interactive Sky Targets**:
+    - **TNT Barrels (`🧨`)**: Volatile red explosive barrels that detonate in a 180px shockwave dealing massive AoE damage to surrounding boulders
+    - **Golden Geodes (`💎`)**: Rare crystalline targets that burst into an 8-coin jackpot shower and drop a guaranteed tactical Power-Up orb
   - [x] Rock splitting mechanics (Large → 2 Medium → 4 Small)
   - [x] Additional enemy/rock types: **Armored Rocks** (🛡️ 40% damage reduction above 50% HP), **Fast Meteor Rocks** (☄️ high horizontal speed, low bounce), and **Healer Crystal Rocks** (💚 periodic healing pulse to nearby rocks)
   - [x] Boss rocks every 3 waves with gravity surge ability + dedicated Boss HP bar
   - [x] **Milestone Mega-Boss Waves** every 10 waves with **Titan Aegis Shield** and **Meteor Swarm** summons
   - [x] Real-time wave progress bar tracking total wave HP
   - [x] Wave clear banner and bonus coin rewards
+- [x] **Tactical Augment Draft ("Choose 1 of 3" on Boss Waves)**
+  - [x] In-run perk draft modal (`#augment-modal`) offered after conquering each Boss wave (every 3 waves or Boss Rush)
+  - [x] 8 stackable tactical run augments with active combat HUD pills:
+    - **Chain Volt (`🌩️`)**: Critical hits zap nearby boulders for 75% lightning damage
+    - **Bank Shot (`🔱`)**: All cannon shots ricochet off arena side walls (+1 wall bounce)
+    - **Permafrost Aura (`❄️`)**: Spawns every boulder chilled for 2.5s (+25% shatter damage)
+    - **Shrapnel Core (`💥`)**: Crushed boulders fire 2 upward kinetic shrapnel bolts into the sky
+    - **Deadeye Optics (`🎯`)**: +15% Critical Hit Chance and +0.4x Critical Damage multiplier
+    - **Hyper Loader (`⚡`)**: +25% Fire Rate boost applied across all cannon weapons
+    - **Aegis Hull +1 (`🛡️`)**: Permanently adds +1 Hull Shield slot and fully repairs all shields
+    - **Midas Bounty (`💰`)**: +35% Coin Value & +8% Power-Up Orb drop chance
 - [x] **8 Visually & Mechanically Distinct Power-Ups (With On-Canvas Tags & Codex)**
   - [x] **Overdrive (`2x SPEED`)**: ⚡ 1.85x Fire Rate firing twin electric cyan hyper-tracer needles
   - [x] **Ricochet Fan (`BOUNCE`)**: 🔱 Spinning 4-point star blades that ricochet off the left and right arena walls
@@ -275,6 +293,11 @@ Because the project uses native ES modules with relative paths (`./src/main.js`)
 - [x] **Economy, Upgrades & Persistence**
   - [x] Physical coin drops with floor bounce, wave-scaled coin values, and magnetic pull toward the cannon
   - [x] 4 upgrade tracks (**Fire Rate**, **Fire Power**, **Coins Multiplier**, **Offline Earnings**) positioned cleanly inside the underground foundation with **Press-and-Hold Auto-Upgrade**
+  - [x] **Visible Upgrade Milestone Evolution Perks**: Real milestone indicators on each upgrade card:
+    - **Fire Rate**: `Lv.4: 2 Barrels`, `Lv.9: 3 Barrels`, `Lv.15: 4 Barrels`, `Lv.25: Auto-Laser`
+    - **Fire Power**: `Lv.10: +45% Exec` (Executioner bonus to rocks < 35% HP), `Lv.20: AoE Blast`, `Lv.30: 2x vs Armor`
+    - **Coin Value**: `Lv.10: +Geodes` (boosts Golden Geode spawn rate), `Lv.20: 2x Boss Coins`, `Lv.30: +Magnet`
+    - **Offline Earnings**: `Lv.10: +1 Hull 🛡️` (+1 maximum Hull Shield), `Lv.20: +25% Power-Up Duration`
   - [x] `localStorage` auto-save with schema migration and two-step inline progress reset in Settings
   - [x] Offline earnings calculation and claim modal on return
 - [x] **5-Tab Hangar & Codex (Cannons, Add-Ons, Skins, Arenas & Guide)**
