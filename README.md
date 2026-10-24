@@ -252,8 +252,12 @@ Because the project uses native ES modules with relative paths (`./src/main.js`)
   - [x] **Milestone Mega-Boss Waves** every 10 waves with **Titan Aegis Shield** and **Meteor Swarm** summons
   - [x] Real-time wave progress bar tracking total wave HP
   - [x] Wave clear banner and bonus coin rewards
-- [x] **Power-Up Drops**
+- [x] **Power-Up Drops (8 Types)**
   - [x] **Overdrive** (⚡ 1.85x Fire Rate & high-velocity plasma bullets)
+  - [x] **Spread Fan** (🔱 Adds angled outer wing streams to blanket the sky)
+  - [x] **Blast Shells** (💣 Explosive rounds that deal 50% area splash damage on impact)
+  - [x] **Pierce Beam** (🔦 High-energy laser rounds that slice straight through multiple boulders)
+  - [x] **Mega Calibre** (🔥 Oversized 2x damage shells with heavy upward knockback)
   - [x] **Force Shield** (🛡️ Protective energy bubble that repels boulders upward on contact)
   - [x] **Coin Magnet** (🧲 Full-screen magnetic pull + 1.5x coin value bonus)
   - [x] **Cryo Slow** (❄️ Slows boulder gravity & movement by 55%)
@@ -262,9 +266,11 @@ Because the project uses native ES modules with relative paths (`./src/main.js`)
   - [x] 4 upgrade tracks: **Fire Rate**, **Fire Power**, **Coins Multiplier**, and **Offline Earnings**
   - [x] `localStorage` auto-save with schema migration and progress reset option
   - [x] Offline earnings calculation and claim modal on return
-- [x] **Unlockable Cannon Skins & Arena Themes**
-  - [x] 5 Cannon Skins (**Classic Azure**, **Crimson Vanguard**, **Golden Sovereign**, **Cyber Neon**, **Void Obsidian**) unlocked purely via in-game progression
-  - [x] 5 Visual Arena Themes (**Midnight Peaks**, **Ember Canyon**, **Frostbite Tundra**, **Synthwave Grid**, **Magma Caldera**)
+- [x] **Unlockable Cannon Varieties, Add-Ons, Skins & Arena Themes**
+  - [x] **5 Cannon Varieties (Chassis)**: **Vulcan Striker**, **Scatter Flak** (+2 fan spread barrels), **Heavy Railgun** (2.4x DMG piercing slugs), **Plasma Gatling** (1.55x fire rate + crit), and **Siege Blast** (area splash mortar)
+  - [x] **5 Tactical Add-Ons**: **Wingman Drones** (🛸 homing plasma pods), **Holo-Scope Sight** (🎯 +18% crit chance & +0.5x crit DMG), **Bumper Buzzsaw** (⚙️ parries & slices low boulders), **Arc Tesla Pylon** (🌩️ chain lightning zaps), and **Sub-Zero Bumper** (❄️ floor bounces chill & damage rocks)
+  - [x] **8 Cannon Skins**: *Classic Azure*, *Crimson Vanguard*, *Emerald Viper*, *Golden Sovereign*, *Solar Flare*, *Cyber Neon*, *Void Obsidian*, and *Starlight Prism*
+  - [x] **7 Visual Arena Themes**: *Midnight Peaks*, *Ember Canyon*, *Bio-Lab Reactor*, *Frostbite Tundra*, *Synthwave Grid*, *Magma Caldera*, and *Deep Nebula*
 - [x] **Stats, Achievements, Controls & Audio**
   - [x] Lifetime stats dashboard & 10 milestone achievements with live progress bars, coin rewards, and unlock toasts
   - [x] Pointer/touch drag controls + Keyboard (`ArrowLeft`, `ArrowRight`, `Space`) support

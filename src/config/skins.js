@@ -1,6 +1,6 @@
 /**
- * Unlockable Cannon Skins Registry
- * Unlocked purely via gameplay milestones (waves, score, rocks crushed, bosses defeated).
+ * Unlockable Cannon Skins Registry (8 Skins)
+ * Unlocked purely via gameplay milestones (waves, score, rocks crushed, bosses defeated, powerups).
  */
 
 export const CANNON_SKINS = [
@@ -37,6 +37,22 @@ export const CANNON_SKINS = [
     isUnlocked: (s) => s.stats.highestWave >= 4,
   },
   {
+    id: 'emerald',
+    name: 'Emerald Viper',
+    reqText: 'Collect 8 Power-Ups or Wave 6',
+    swatch: 'linear-gradient(135deg, #2ed573, #0b8457)',
+    bodyTop: '#2ed573',
+    bodyBot: '#056644',
+    stroke: '#7bed9f',
+    barrelMid: '#b8e994',
+    rim: '#fffa65',
+    wheelRim: '#2ed573',
+    bulletTop: '#ffffff',
+    bulletMid: '#7bed9f',
+    bulletBot: '#1eae57',
+    isUnlocked: (s) => s.stats.powerupsCollected >= 8 || s.stats.highestWave >= 6,
+  },
+  {
     id: 'golden',
     name: 'Golden Sovereign',
     reqText: 'Wave 8 or 5K Score',
@@ -53,9 +69,25 @@ export const CANNON_SKINS = [
     isUnlocked: (s) => s.stats.highestWave >= 8 || s.bestScore >= 5000,
   },
   {
+    id: 'solar',
+    name: 'Solar Flare',
+    reqText: 'Reach Wave 10',
+    swatch: 'linear-gradient(135deg, #ff9f1a, #eb2f06)',
+    bodyTop: '#ff9f1a',
+    bodyBot: '#c23616',
+    stroke: '#fffa65',
+    barrelMid: '#ffda79',
+    rim: '#fffa65',
+    wheelRim: '#ff9f1a',
+    bulletTop: '#ffffff',
+    bulletMid: '#fffa65',
+    bulletBot: '#ff3838',
+    isUnlocked: (s) => s.stats.highestWave >= 10,
+  },
+  {
     id: 'neon',
     name: 'Cyber Neon',
-    reqText: 'Destroy 150 Rocks',
+    reqText: 'Destroy 150 Rocks or Wave 12',
     swatch: 'linear-gradient(135deg, #00d2d3, #5f27cd)',
     bodyTop: '#00d2d3',
     bodyBot: '#5f27cd',
@@ -71,7 +103,7 @@ export const CANNON_SKINS = [
   {
     id: 'obsidian',
     name: 'Void Obsidian',
-    reqText: 'Defeat 5 Bosses',
+    reqText: 'Defeat 5 Bosses or Wave 16',
     swatch: 'linear-gradient(135deg, #2f3542, #a55eea)',
     bodyTop: '#3d3d3d',
     bodyBot: '#141414',
@@ -83,5 +115,21 @@ export const CANNON_SKINS = [
     bulletMid: '#d980fa',
     bulletBot: '#8e44ad',
     isUnlocked: (s) => s.stats.bossesDefeated >= 5 || s.stats.highestWave >= 16,
+  },
+  {
+    id: 'prismatic',
+    name: 'Starlight Prism',
+    reqText: 'Reach Wave 20 or 25K Score',
+    swatch: 'linear-gradient(135deg, #ff9ff3, #48dbfb, #ffdd59)',
+    bodyTop: '#ff9ff3',
+    bodyBot: '#341f97',
+    stroke: '#48dbfb',
+    barrelMid: '#ffffff',
+    rim: '#ffdd59',
+    wheelRim: '#48dbfb',
+    bulletTop: '#ffffff',
+    bulletMid: '#ff9ff3',
+    bulletBot: '#48dbfb',
+    isUnlocked: (s) => s.stats.highestWave >= 20 || s.bestScore >= 25000,
   },
 ];

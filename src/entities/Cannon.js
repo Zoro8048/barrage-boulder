@@ -1,5 +1,5 @@
 /**
- * Cannon Entity - Represents the player's mobile turret and extensible Wingman Drone slots.
+ * Cannon Entity - Represents the player's mobile turret and tactical add-on states.
  */
 
 import { PHYSICS, COMBAT } from '../config/constants.js';
@@ -16,6 +16,10 @@ export class Cannon {
     this.shootCooldown = 0;
     this.droneCooldown = COMBAT.DRONE_FIRE_INTERVAL;
     this.droneBobPhase = 0;
+    this.sawCooldown = 0;
+    this.sawAngle = 0;
+    this.teslaCooldown = 1.2;
+    this.teslaArc = null; // { targetX, targetY, timer }
     this.muzzleFlash = 0;
   }
 
@@ -47,10 +51,17 @@ export class Cannon {
     const dx = this.x - prevX;
     this.wheelAngle += dx / 13;
     this.droneBobPhase += dt * 4.5;
+    this.sawAngle += dt * 16;
 
     if (this.recoil > 0) this.recoil = Math.max(0, this.recoil - dt * 28);
     if (this.muzzleFlash > 0) this.muzzleFlash = Math.max(0, this.muzzleFlash - dt * 14);
     if (this.shootCooldown > 0) this.shootCooldown -= dt;
     if (this.droneCooldown > 0) this.droneCooldown -= dt;
+    if (this.sawCooldown > 0) this.sawCooldown = Math.max(0, this.sawCooldown - dt);
+    if (this.teslaCooldown > 0) this.teslaCooldown -= dt;
+    if (this.teslaArc) {
+      this.teslaArc.timer -= dt;
+      if (this.teslaArc.timer <= 0) this.teslaArc = null;
+    }
   }
 }

@@ -99,8 +99,8 @@
 
   // --- Module: src/config/skins.js ---
   /**
-   * Unlockable Cannon Skins Registry
-   * Unlocked purely via gameplay milestones (waves, score, rocks crushed, bosses defeated).
+   * Unlockable Cannon Skins Registry (8 Skins)
+   * Unlocked purely via gameplay milestones (waves, score, rocks crushed, bosses defeated, powerups).
    */
   const CANNON_SKINS = [
     {
@@ -136,6 +136,22 @@
       isUnlocked: (s) => s.stats.highestWave >= 4,
     },
     {
+      id: 'emerald',
+      name: 'Emerald Viper',
+      reqText: 'Collect 8 Power-Ups or Wave 6',
+      swatch: 'linear-gradient(135deg, #2ed573, #0b8457)',
+      bodyTop: '#2ed573',
+      bodyBot: '#056644',
+      stroke: '#7bed9f',
+      barrelMid: '#b8e994',
+      rim: '#fffa65',
+      wheelRim: '#2ed573',
+      bulletTop: '#ffffff',
+      bulletMid: '#7bed9f',
+      bulletBot: '#1eae57',
+      isUnlocked: (s) => s.stats.powerupsCollected >= 8 || s.stats.highestWave >= 6,
+    },
+    {
       id: 'golden',
       name: 'Golden Sovereign',
       reqText: 'Wave 8 or 5K Score',
@@ -152,9 +168,25 @@
       isUnlocked: (s) => s.stats.highestWave >= 8 || s.bestScore >= 5000,
     },
     {
+      id: 'solar',
+      name: 'Solar Flare',
+      reqText: 'Reach Wave 10',
+      swatch: 'linear-gradient(135deg, #ff9f1a, #eb2f06)',
+      bodyTop: '#ff9f1a',
+      bodyBot: '#c23616',
+      stroke: '#fffa65',
+      barrelMid: '#ffda79',
+      rim: '#fffa65',
+      wheelRim: '#ff9f1a',
+      bulletTop: '#ffffff',
+      bulletMid: '#fffa65',
+      bulletBot: '#ff3838',
+      isUnlocked: (s) => s.stats.highestWave >= 10,
+    },
+    {
       id: 'neon',
       name: 'Cyber Neon',
-      reqText: 'Destroy 150 Rocks',
+      reqText: 'Destroy 150 Rocks or Wave 12',
       swatch: 'linear-gradient(135deg, #00d2d3, #5f27cd)',
       bodyTop: '#00d2d3',
       bodyBot: '#5f27cd',
@@ -170,7 +202,7 @@
     {
       id: 'obsidian',
       name: 'Void Obsidian',
-      reqText: 'Defeat 5 Bosses',
+      reqText: 'Defeat 5 Bosses or Wave 16',
       swatch: 'linear-gradient(135deg, #2f3542, #a55eea)',
       bodyTop: '#3d3d3d',
       bodyBot: '#141414',
@@ -183,11 +215,27 @@
       bulletBot: '#8e44ad',
       isUnlocked: (s) => s.stats.bossesDefeated >= 5 || s.stats.highestWave >= 16,
     },
+    {
+      id: 'prismatic',
+      name: 'Starlight Prism',
+      reqText: 'Reach Wave 20 or 25K Score',
+      swatch: 'linear-gradient(135deg, #ff9ff3, #48dbfb, #ffdd59)',
+      bodyTop: '#ff9ff3',
+      bodyBot: '#341f97',
+      stroke: '#48dbfb',
+      barrelMid: '#ffffff',
+      rim: '#ffdd59',
+      wheelRim: '#48dbfb',
+      bulletTop: '#ffffff',
+      bulletMid: '#ff9ff3',
+      bulletBot: '#48dbfb',
+      isUnlocked: (s) => s.stats.highestWave >= 20 || s.bestScore >= 25000,
+    },
   ];
 
   // --- Module: src/config/themes.js ---
   /**
-   * Unlockable Visual Arena Themes Registry
+   * Unlockable Visual Arena Themes Registry (7 Themes)
    */
   const ARENA_THEMES = [
     {
@@ -223,9 +271,25 @@
       isUnlocked: (s) => s.stats.highestWave >= 3,
     },
     {
+      id: 'toxic',
+      name: 'Bio-Lab Reactor',
+      reqText: 'Reach Wave 5',
+      swatch: 'linear-gradient(135deg, #0b2418, #a3cb38)',
+      skyTop: '#071710',
+      skyMid: '#113322',
+      skyBot: '#1c5236',
+      mtnBack: '#143d28',
+      mtnFront: '#0c291a',
+      grassTop: '#a3cb38',
+      grassSub: '#759622',
+      earthTop: '#102b1d',
+      earthBot: '#07140d',
+      isUnlocked: (s) => s.stats.highestWave >= 5,
+    },
+    {
       id: 'arctic',
       name: 'Frostbite Tundra',
-      reqText: 'Reach Wave 6',
+      reqText: 'Reach Wave 7',
       swatch: 'linear-gradient(135deg, #0a2342, #7ed6df)',
       skyTop: '#07162c',
       skyMid: '#12355b',
@@ -236,7 +300,7 @@
       grassSub: '#22a6b3',
       earthTop: '#132a42',
       earthBot: '#091522',
-      isUnlocked: (s) => s.stats.highestWave >= 6,
+      isUnlocked: (s) => s.stats.highestWave >= 7,
     },
     {
       id: 'synthwave',
@@ -270,11 +334,157 @@
       earthBot: '#0f0404',
       isUnlocked: (s) => s.stats.highestWave >= 15,
     },
+    {
+      id: 'starlight',
+      name: 'Deep Nebula',
+      reqText: 'Reach Wave 20',
+      swatch: 'linear-gradient(135deg, #060919, #48dbfb)',
+      skyTop: '#040611',
+      skyMid: '#0e1638',
+      skyBot: '#1d2d6e',
+      mtnBack: '#152254',
+      mtnFront: '#0c1436',
+      grassTop: '#48dbfb',
+      grassSub: '#0abde3',
+      earthTop: '#0e183b',
+      earthBot: '#050917',
+      isUnlocked: (s) => s.stats.highestWave >= 20,
+    },
+  ];
+
+  // --- Module: src/config/cannons.js ---
+  /**
+   * Unlockable Cannon Varieties (Chassis Classes)
+   * Each variety changes the cannon's firing pattern, barrel geometry, and combat feel.
+   */
+  const CANNON_VARIETIES = [
+    {
+      id: 'striker',
+      icon: '🔫',
+      name: 'Vulcan Striker',
+      desc: 'Balanced multi-barrel rapid volley',
+      reqText: 'Default Chassis',
+      fireRateMult: 1.0,
+      damageMult: 1.0,
+      extraBarrels: 0,
+      spreadAngle: 0,
+      pierceCount: 0,
+      splashRadius: 0,
+      critBonus: 0,
+      isUnlocked: () => true,
+    },
+    {
+      id: 'shotgun',
+      icon: '🔱',
+      name: 'Scatter Flak',
+      desc: '+2 barrels in a wide fan spread',
+      reqText: 'Reach Wave 3',
+      fireRateMult: 0.9,
+      damageMult: 0.72,
+      extraBarrels: 2,
+      spreadAngle: 0.28,
+      pierceCount: 0,
+      splashRadius: 0,
+      critBonus: 0,
+      isUnlocked: (s) => s.stats.highestWave >= 3,
+    },
+    {
+      id: 'railgun',
+      icon: '⚡',
+      name: 'Heavy Railgun',
+      desc: '2.4x DMG high-velocity piercing slugs',
+      reqText: 'Reach Wave 7',
+      fireRateMult: 0.58,
+      damageMult: 2.4,
+      extraBarrels: -1,
+      spreadAngle: 0,
+      pierceCount: 1,
+      splashRadius: 0,
+      critBonus: 0.08,
+      isUnlocked: (s) => s.stats.highestWave >= 7,
+    },
+    {
+      id: 'plasma',
+      icon: '🔥',
+      name: 'Plasma Gatling',
+      desc: '1.55x Fire Rate + 10% Crit Chance',
+      reqText: 'Reach Wave 11',
+      fireRateMult: 1.55,
+      damageMult: 0.72,
+      extraBarrels: 0,
+      spreadAngle: 0.05,
+      pierceCount: 0,
+      splashRadius: 0,
+      critBonus: 0.1,
+      isUnlocked: (s) => s.stats.highestWave >= 11,
+    },
+    {
+      id: 'mortar',
+      icon: '💣',
+      name: 'Siege Blast',
+      desc: 'Explosive shells deal 45% area splash DMG',
+      reqText: 'Reach Wave 15',
+      fireRateMult: 0.78,
+      damageMult: 1.35,
+      extraBarrels: 0,
+      spreadAngle: 0,
+      pierceCount: 0,
+      splashRadius: 85,
+      critBonus: 0,
+      isUnlocked: (s) => s.stats.highestWave >= 15,
+    },
+  ];
+
+  // --- Module: src/config/addons.js ---
+  /**
+   * Unlockable Cannon Add-Ons / Tactical Attachments
+   */
+  const CANNON_ADDONS = [
+    {
+      id: 'wingmanDrones',
+      icon: '🛸',
+      name: 'Wingman Drones',
+      desc: 'Hovering pods fire homing plasma bolts',
+      reqText: 'Default Add-On',
+      isUnlocked: () => true,
+    },
+    {
+      id: 'laserSight',
+      icon: '🎯',
+      name: 'Holo-Scope Sight',
+      desc: '+18% Crit Chance & +0.5x Crit Damage',
+      reqText: 'Reach Wave 5',
+      isUnlocked: (s) => s.stats.highestWave >= 5,
+    },
+    {
+      id: 'sawBlade',
+      icon: '⚙️',
+      name: 'Bumper Buzzsaw',
+      desc: 'Spinning saw slices & bounces low rocks (2.5s CD)',
+      reqText: 'Reach Wave 8',
+      isUnlocked: (s) => s.stats.highestWave >= 8,
+    },
+    {
+      id: 'teslaCoil',
+      icon: '🌩️',
+      name: 'Arc Tesla Pylon',
+      desc: 'Zaps boulders with chain lightning every 1.3s',
+      reqText: 'Reach Wave 12',
+      isUnlocked: (s) => s.stats.highestWave >= 12,
+    },
+    {
+      id: 'cryoCore',
+      icon: '❄️',
+      name: 'Sub-Zero Bumper',
+      desc: 'Floor bounces deal frost DMG & slow rocks',
+      reqText: 'Reach Wave 16',
+      isUnlocked: (s) => s.stats.highestWave >= 16,
+    },
   ];
 
   // --- Module: src/config/powerups.js ---
   /**
-   * Power-up Drops Metadata & Durations
+   * Power-up Drops Metadata & Durations (8 Power-Up Types)
    */
   const POWERUP_META = {
     rapidFire: {
@@ -284,10 +494,38 @@
       color: '#48dbfb',
       duration: 8,
     },
+    spreadShot: {
+      id: 'spreadShot',
+      icon: '🔱',
+      label: 'SPREAD FAN',
+      color: '#ff9f1a',
+      duration: 8.5,
+    },
+    explosiveRounds: {
+      id: 'explosiveRounds',
+      icon: '💣',
+      label: 'BLAST SHELLS',
+      color: '#ff4757',
+      duration: 8,
+    },
+    piercingLaser: {
+      id: 'piercingLaser',
+      icon: '🔦',
+      label: 'PIERCE BEAM',
+      color: '#d980fa',
+      duration: 7.5,
+    },
+    giantBullets: {
+      id: 'giantBullets',
+      icon: '🔥',
+      label: 'MEGA CALIBRE',
+      color: '#ffa502',
+      duration: 8,
+    },
     shield: {
       id: 'shield',
       icon: '🛡️',
-      label: 'SHIELD',
+      label: 'FORCE SHIELD',
       color: '#2ed573',
       duration: 8.5,
     },
@@ -306,7 +544,7 @@
       duration: 7.5,
     },
   };
-  const POWERUP_DROP_CHANCE = 0.14;
+  const POWERUP_DROP_CHANCE = 0.18;
 
   // --- Module: src/config/rockVariants.js ---
   /**
@@ -627,6 +865,8 @@
       equipped: {
         skin: 'classic',
         theme: 'midnight',
+        cannon: 'striker',
+        addon: 'wingmanDrones',
       },
       settings: {
         sfxVolume: 80,
@@ -710,6 +950,14 @@
       return ARENA_THEMES.find((t) => t.id === this.state.equipped.theme) || ARENA_THEMES[0];
     }
   
+    getActiveCannon() {
+      return CANNON_VARIETIES.find((c) => c.id === this.state.equipped.cannon) || CANNON_VARIETIES[0];
+    }
+  
+    getActiveAddon() {
+      return CANNON_ADDONS.find((a) => a.id === this.state.equipped.addon) || CANNON_ADDONS[0];
+    }
+  
     getPendingOfflineReward(now = Date.now()) {
       const elapsedSeconds = (now - (this.state.lastTimestamp || now)) / 1000;
       return calculateOfflineEarnings(elapsedSeconds, this.state.upgrades.offlineEarnings);
@@ -758,7 +1006,7 @@
 
   // --- Module: src/entities/Cannon.js ---
   /**
-   * Cannon Entity - Represents the player's mobile turret and extensible Wingman Drone slots.
+   * Cannon Entity - Represents the player's mobile turret and tactical add-on states.
    */
   class Cannon {
     constructor(x = 200, y = 600) {
@@ -771,6 +1019,10 @@
       this.shootCooldown = 0;
       this.droneCooldown = COMBAT.DRONE_FIRE_INTERVAL;
       this.droneBobPhase = 0;
+      this.sawCooldown = 0;
+      this.sawAngle = 0;
+      this.teslaCooldown = 1.2;
+      this.teslaArc = null; // { targetX, targetY, timer }
       this.muzzleFlash = 0;
     }
   
@@ -802,11 +1054,18 @@
       const dx = this.x - prevX;
       this.wheelAngle += dx / 13;
       this.droneBobPhase += dt * 4.5;
+      this.sawAngle += dt * 16;
   
       if (this.recoil > 0) this.recoil = Math.max(0, this.recoil - dt * 28);
       if (this.muzzleFlash > 0) this.muzzleFlash = Math.max(0, this.muzzleFlash - dt * 14);
       if (this.shootCooldown > 0) this.shootCooldown -= dt;
       if (this.droneCooldown > 0) this.droneCooldown -= dt;
+      if (this.sawCooldown > 0) this.sawCooldown = Math.max(0, this.sawCooldown - dt);
+      if (this.teslaCooldown > 0) this.teslaCooldown -= dt;
+      if (this.teslaArc) {
+        this.teslaArc.timer -= dt;
+        if (this.teslaArc.timer <= 0) this.teslaArc = null;
+      }
     }
   }
 
@@ -1175,13 +1434,18 @@
         invulnerableTimer,
         activePowerups,
         combatSystem,
+        saveManager,
       } = engine;
   
-      const timeScale = activePowerups.freeze > 0 ? PHYSICS.CRYO_TIME_SCALE : 1;
-      const rDt = dt * timeScale;
+      const addon = saveManager.getActiveAddon();
+      const globalScale = activePowerups.freeze > 0 ? PHYSICS.CRYO_TIME_SCALE : 1;
   
       for (let i = rocks.length - 1; i >= 0; i--) {
         const r = rocks[i];
+        if (r.chillTimer > 0) r.chillTimer = Math.max(0, r.chillTimer - dt);
+        const rockScale = r.chillTimer > 0 ? Math.min(globalScale, 0.55) : globalScale;
+        const rDt = dt * rockScale;
+  
         r.vy += PHYSICS.GRAVITY * rDt;
         r.x += r.vx * rDt;
         r.y += r.vy * rDt;
@@ -1223,7 +1487,7 @@
           r.vAngle = -Math.abs(r.vAngle);
         }
   
-        // Ground bounce (varied per rock + slight per-bounce jitter to prevent synchronized walls)
+        // Ground bounce (varied per rock + Sub-Zero Bumper add-on frost effect)
         if (r.y + r.radius >= groundY) {
           r.y = groundY - r.radius;
           const baseBounce = ROCK_BOUNCE_VELOCITIES[r.size] || -550;
@@ -1233,20 +1497,39 @@
           r.vy = baseBounce * (varCfg.bounceMultiplier || 1) * perRockMult * liveJitter;
           r.hitScale = 1.1;
           engine.addParticles(r.x, groundY, 'rgba(255,255,255,0.35)', 4, 70);
+  
+          // Sub-Zero Bumper Add-on: Floor bounce chills & damages rock
+          if (gameState === 'PLAYING' && addon.id === 'cryoCore') {
+            r.chillTimer = 1.6;
+            const frostDmg = Math.max(1, Math.round(engine.getBulletDamage() * 1.8));
+            combatSystem.applyDamageToRock(r, frostDmg, engine, { isCrit: false });
+            if (!rocks.includes(r)) continue;
+          }
         }
   
-        // Cannon collision
+        // Cannon collision (with Force Shield & Bumper Buzzsaw Add-on support)
         if (gameState === 'PLAYING') {
           const cannonCenterY = cannon.y - 24;
           const distSq = (r.x - cannon.x) ** 2 + (r.y - cannonCenterY) ** 2;
           const hitDist = r.radius + cannon.radius - 7;
           if (distSq <= hitDist * hitDist) {
             if (invulnerableTimer > 0 || activePowerups.shield > 0) {
-              r.vy = -510;
+              r.vy = -520;
               r.y = Math.min(r.y, cannonCenterY - hitDist - 4);
               this.bus.emit('sfx:hit', { hpRatio: 0.2, armored: true });
               engine.triggerShake(6, 0.14);
               engine.addParticles(r.x, r.y + r.radius * 0.5, '#2ed573', 10, 180);
+            } else if (addon.id === 'sawBlade' && cannon.sawCooldown <= 0) {
+              // Bumper Buzzsaw slices rock and bounces it skyward!
+              cannon.sawCooldown = 2.5;
+              r.vy = -540;
+              r.y = Math.min(r.y, cannonCenterY - hitDist - 6);
+              this.bus.emit('sfx:hit', { hpRatio: 0.1, armored: true });
+              engine.triggerShake(8, 0.18);
+              engine.addParticles(cannon.x, cannon.y - 36, '#ff9f1a', 14, 210);
+              engine.addFloatingText(cannon.x, cannon.y - 54, '⚙️ SAW PARRY!', '#ff9f1a', 14);
+              const sawDmg = Math.max(2, Math.round(engine.getBulletDamage() * 4.5));
+              combatSystem.applyDamageToRock(r, sawDmg, engine, { isCrit: true });
             } else {
               engine.triggerGameOver();
               break;
@@ -1379,8 +1662,9 @@
 
   // --- Module: src/systems/CombatSystem.js ---
   /**
-   * CombatSystem - Handles volley firing, Wingman Drone targeting, Critical Hits,
-   * Combo multipliers, Ultimate Supernova Beam, armor cracking, rock splitting, and boss skills.
+   * CombatSystem - Handles volley firing (across all Cannon Varieties & Power-Ups),
+   * Wingman Drone targeting, Tesla Pylon zaps, Critical Hits, Combo multipliers,
+   * Ultimate Supernova Beam, armor cracking, rock splitting, and boss skills.
    */
   class CombatSystem {
     constructor(bus) {
@@ -1388,29 +1672,81 @@
     }
   
     fireVolley(engine) {
-      const { cannon, bullets, bulletPool } = engine;
-      const barrels = engine.getBarrelCount();
+      const { cannon, bullets, bulletPool, activePowerups, saveManager } = engine;
+      const variety = saveManager.getActiveCannon();
+      const baseBarrels = engine.getBarrelCount();
+      const barrels = Math.max(1, baseBarrels + (variety.extraBarrels || 0));
       const spacing = 11;
       const totalSpan = (barrels - 1) * spacing;
-      const isOverdrive = engine.activePowerups.rapidFire > 0;
+  
+      const isOverdrive = activePowerups.rapidFire > 0;
+      const isGiant = activePowerups.giantBullets > 0;
+      const isPierce = activePowerups.piercingLaser > 0;
+      const isExplosive = activePowerups.explosiveRounds > 0;
+      const isSpreadPowerup = activePowerups.spreadShot > 0;
+  
+      const speed =
+        variety.id === 'railgun'
+          ? -980
+          : isOverdrive
+          ? PHYSICS.BULLET_SPEED_OVERDRIVE
+          : PHYSICS.BULLET_SPEED_NORMAL;
+  
+      const pierceLeft = (isPierce ? 3 : 0) + (variety.pierceCount || 0);
+      const splashRadius = isExplosive ? 95 : variety.splashRadius || 0;
+      const dmgRatio = (variety.damageMult || 1) * (isGiant ? 2.0 : 1.0);
+      const bulletRadius = isGiant ? 10 : variety.id === 'railgun' ? 7 : isOverdrive ? 6.2 : 5.5;
   
       for (let i = 0; i < barrels; i++) {
         const offsetX = -totalSpan / 2 + i * spacing;
+        const normIdx = barrels > 1 ? i / (barrels - 1) - 0.5 : 0;
+        const angle = normIdx * (variety.spreadAngle || 0);
+        const vx = Math.sin(angle) * Math.abs(speed) + offsetX * 1.2;
+        const vy = -Math.cos(angle) * Math.abs(speed);
+  
         bullets.push(
           bulletPool.acquire({
             x: cannon.x + offsetX,
             y: cannon.y - 48,
-            vx: offsetX * 1.4,
-            vy: isOverdrive ? PHYSICS.BULLET_SPEED_OVERDRIVE : PHYSICS.BULLET_SPEED_NORMAL,
-            radius: isOverdrive ? 6.2 : 5.5,
+            vx,
+            vy,
+            radius: bulletRadius,
             overdrive: isOverdrive,
+            isGiant,
+            isPierce: pierceLeft > 0,
+            pierceLeft,
+            splashRadius,
+            lastHitRock: null,
             isDrone: false,
-            damageRatio: 1.0,
+            damageRatio: dmgRatio,
           })
         );
       }
   
-      cannon.recoil = 6;
+      // Spread Fan Power-Up adds 2 angled wing shots
+      if (isSpreadPowerup) {
+        for (const sideAngle of [-0.26, 0.26]) {
+          bullets.push(
+            bulletPool.acquire({
+              x: cannon.x,
+              y: cannon.y - 46,
+              vx: Math.sin(sideAngle) * Math.abs(speed),
+              vy: -Math.cos(sideAngle) * Math.abs(speed),
+              radius: bulletRadius * 0.9,
+              overdrive: isOverdrive,
+              isGiant,
+              isPierce: pierceLeft > 0,
+              pierceLeft,
+              splashRadius,
+              lastHitRock: null,
+              isDrone: false,
+              damageRatio: dmgRatio * 0.85,
+            })
+          );
+        }
+      }
+  
+      cannon.recoil = variety.id === 'railgun' ? 9 : 6;
       cannon.muzzleFlash = 1;
       this.bus.emit('sfx:shoot', { overdrive: isOverdrive });
     }
@@ -1420,7 +1756,6 @@
       const droneCount = engine.getDroneCount();
       if (droneCount <= 0 || rocks.length === 0) return;
   
-      // Target the boulder closest to the ground
       let target = rocks[0];
       for (const r of rocks) {
         if (r.y + r.radius > target.y + target.radius) {
@@ -1446,11 +1781,100 @@
             vy: (dy / dist) * COMBAT.DRONE_BULLET_SPEED,
             radius: 4.8,
             overdrive: false,
+            isGiant: false,
+            isPierce: false,
+            pierceLeft: 0,
+            splashRadius: 0,
+            lastHitRock: null,
             isDrone: true,
             damageRatio: COMBAT.DRONE_DAMAGE_RATIO,
           })
         );
       }
+    }
+  
+    fireTeslaCoil(engine) {
+      const { cannon, rocks } = engine;
+      if (rocks.length === 0) return;
+      const target = rocks[Math.floor(Math.random() * rocks.length)];
+      const zapDmg = Math.max(2, Math.round(engine.getBulletDamage() * 2.2));
+  
+      cannon.teslaArc = {
+        targetX: target.x,
+        targetY: target.y,
+        timer: 0.18,
+      };
+  
+      this.applyDamageToRock(target, zapDmg, engine, { isCrit: false, isZap: true });
+      engine.addParticles(target.x, target.y, '#48dbfb', 6, 150);
+    }
+  
+    applyDamageToRock(r, rawDmg, engine, { isCrit = false, isZap = false } = {}) {
+      const { rocks, saveManager, waveSystem } = engine;
+      const save = saveManager.state;
+      const idx = rocks.indexOf(r);
+      if (idx === -1) return 0;
+  
+      if (r.bossShieldTimer > 0) {
+        this.bus.emit('sfx:hit', { hpRatio: 1, armored: true });
+        return 0;
+      }
+  
+      const hasIntactArmor = r.variant === 'armored' && !r.armorBroken;
+      const armorScale = ROCK_VARIANTS.armored.armorDamageScale;
+      const afterArmor = hasIntactArmor ? Math.max(1, Math.round(rawDmg * armorScale)) : rawDmg;
+      const actualDmg = Math.min(r.hp, afterArmor);
+  
+      r.hp -= actualDmg;
+  
+      engine.comboCount += 1;
+      engine.comboTimer = COMBAT.COMBO_DECAY_TIME;
+      const comboMult = getComboMultiplier(engine.comboCount);
+      const scoreGain = Math.round(actualDmg * comboMult);
+  
+      engine.score += scoreGain;
+      waveSystem.waveDamageDealt += actualDmg;
+      if (engine.score > save.bestScore) {
+        save.bestScore = engine.score;
+      }
+  
+      engine.addUltimateCharge(COMBAT.ULTIMATE_CHARGE_PER_HIT);
+  
+      if (isCrit) {
+        engine.addFloatingText(r.x, r.y - 12, `💥 ${formatNum(actualDmg)}!`, '#ff4757', 14);
+      } else if (isZap) {
+        engine.addFloatingText(r.x, r.y - 10, `⚡ ${formatNum(actualDmg)}`, '#48dbfb', 13);
+      }
+  
+      if (
+        hasIntactArmor &&
+        r.hp <= r.maxHp * ROCK_VARIANTS.armored.armorBreakThreshold &&
+        r.hp > 0
+      ) {
+        r.armorBroken = true;
+        engine.addParticles(r.x, r.y, '#dfe4ea', 14, 200);
+        engine.addFloatingText(r.x, r.y - r.radius, 'ARMOR CRACKED!', '#dfe4ea', 13);
+      }
+  
+      r.hitScale = isCrit ? 1.22 : 1.15;
+      r.hitFlash = 0.22;
+  
+      if (r.hp <= 0) {
+        this.destroyRock(r, idx, engine, false);
+      }
+  
+      this.bus.emit('hud:scoreUpdated');
+      this.bus.emit('combo:updated', {
+        count: engine.comboCount,
+        multiplier: comboMult,
+      });
+      this.bus.emit('wave:updated', {
+        waveNum: save.wave,
+        damageDealt: waveSystem.waveDamageDealt,
+        totalHP: waveSystem.waveTotalHP,
+      });
+  
+      return actualDmg;
     }
   
     triggerUltimate(engine) {
@@ -1461,7 +1885,13 @@
       engine.invulnerableTimer = Math.max(engine.invulnerableTimer, 2.0);
       engine.triggerShake(15, 0.4);
       engine.addShockwave(engine.cannon.x, engine.cannon.y - 40, 420, 'rgba(72, 219, 251, 0.9)');
-      engine.addFloatingText(engine.width / 2, engine.height * 0.36, '☄️ ORBITAL SUPERNOVA!', '#48dbfb', 20);
+      engine.addFloatingText(
+        engine.width / 2,
+        engine.height * 0.36,
+        '☄️ ORBITAL SUPERNOVA!',
+        '#48dbfb',
+        20
+      );
   
       const ultDamage = Math.max(15, Math.round(engine.getBulletDamage() * 14));
       const save = engine.saveManager.state;
@@ -1500,9 +1930,16 @@
     }
   
     updateBullets(dt, engine) {
-      const { bullets, bulletPool, rocks, width, saveManager, waveSystem } = engine;
-      const save = saveManager.state;
+      const { bullets, bulletPool, rocks, width, saveManager } = engine;
       const baseBulletDmg = engine.getBulletDamage();
+      const variety = saveManager.getActiveCannon();
+      const addon = saveManager.getActiveAddon();
+  
+      const critChance =
+        COMBAT.CRIT_CHANCE +
+        (variety.critBonus || 0) +
+        (addon.id === 'laserSight' ? 0.18 : 0);
+      const critMult = COMBAT.CRIT_MULTIPLIER + (addon.id === 'laserSight' ? 0.5 : 0);
   
       for (let i = bullets.length - 1; i >= 0; i--) {
         const b = bullets[i];
@@ -1515,87 +1952,57 @@
           continue;
         }
   
-        let hit = false;
+        let consumeBullet = false;
         for (let j = rocks.length - 1; j >= 0; j--) {
           const r = rocks[j];
+          if (b.lastHitRock === r) continue;
+  
           const distSq = (b.x - r.x) ** 2 + (b.y - r.y) ** 2;
           if (distSq <= (r.radius + b.radius) ** 2) {
-            hit = true;
+            b.lastHitRock = r;
   
-            if (r.bossShieldTimer > 0) {
-              this.bus.emit('sfx:hit', { hpRatio: 1, armored: true });
-              engine.addParticles(b.x, b.y, '#48dbfb', 4, 110);
-              break;
-            }
-  
-            // Roll Critical Hit
-            const isCrit = !b.isDrone && Math.random() < COMBAT.CRIT_CHANCE;
-            const critMult = isCrit ? COMBAT.CRIT_MULTIPLIER : 1.0;
-            const scaledDmg = Math.max(1, Math.round(baseBulletDmg * (b.damageRatio || 1) * critMult));
+            const isCrit = !b.isDrone && Math.random() < critChance;
+            const mult = isCrit ? critMult : 1.0;
+            const scaledDmg = Math.max(1, Math.round(baseBulletDmg * (b.damageRatio || 1) * mult));
   
             const hasIntactArmor = r.variant === 'armored' && !r.armorBroken;
-            const armorScale = ROCK_VARIANTS.armored.armorDamageScale;
-            const rawDmg = hasIntactArmor ? Math.max(1, Math.round(scaledDmg * armorScale)) : scaledDmg;
-            const actualDmg = Math.min(r.hp, rawDmg);
-  
-            r.hp -= actualDmg;
-  
-            // Build Combo & Ultimate Charge
-            engine.comboCount += 1;
-            engine.comboTimer = COMBAT.COMBO_DECAY_TIME;
-            const comboMult = getComboMultiplier(engine.comboCount);
-            const scoreGain = Math.round(actualDmg * comboMult);
-  
-            engine.score += scoreGain;
-            waveSystem.waveDamageDealt += actualDmg;
-            if (engine.score > save.bestScore) {
-              save.bestScore = engine.score;
-            }
-  
-            engine.addUltimateCharge(COMBAT.ULTIMATE_CHARGE_PER_HIT);
-  
-            if (isCrit) {
-              engine.addFloatingText(
-                b.x,
-                b.y - 12,
-                `💥 ${formatNum(actualDmg)}!`,
-                '#ff4757',
-                14
-              );
-            }
-  
-            if (hasIntactArmor && r.hp <= r.maxHp * ROCK_VARIANTS.armored.armorBreakThreshold && r.hp > 0) {
-              r.armorBroken = true;
-              engine.addParticles(r.x, r.y, '#dfe4ea', 14, 200);
-              engine.addFloatingText(r.x, r.y - r.radius, 'ARMOR CRACKED!', '#dfe4ea', 13);
-            }
-  
-            r.hitScale = isCrit ? 1.22 : 1.15;
-            r.hitFlash = 0.22;
-            if (r.vy > -120) r.vy -= 12;
+            if (r.vy > -120) r.vy -= b.isGiant ? 28 : 12;
   
             this.bus.emit('sfx:hit', { hpRatio: r.hp / r.maxHp, armored: hasIntactArmor });
-            engine.addParticles(b.x, b.y, isCrit ? '#ff4757' : hasIntactArmor ? '#dfe4ea' : '#fffa65', isCrit ? 6 : 3, 110);
+            engine.addParticles(
+              b.x,
+              b.y,
+              isCrit ? '#ff4757' : hasIntactArmor ? '#dfe4ea' : '#fffa65',
+              isCrit ? 6 : 3,
+              110
+            );
   
-            if (r.hp <= 0) {
-              this.destroyRock(r, j, engine, false);
+            this.applyDamageToRock(r, scaledDmg, engine, { isCrit });
+  
+            // Area Splash Damage (Explosive Rounds Power-Up or Siege Blast Cannon)
+            if (b.splashRadius > 0) {
+              engine.addShockwave(b.x, b.y, b.splashRadius, 'rgba(255, 118, 117, 0.75)');
+              const splashDmg = Math.max(1, Math.round(scaledDmg * 0.5));
+              for (let k = rocks.length - 1; k >= 0; k--) {
+                const other = rocks[k];
+                if (!other || other === r) continue;
+                const d = Math.hypot(other.x - b.x, other.y - b.y);
+                if (d <= b.splashRadius + other.radius) {
+                  this.applyDamageToRock(other, splashDmg, engine, { isCrit: false });
+                }
+              }
             }
   
-            this.bus.emit('hud:scoreUpdated');
-            this.bus.emit('combo:updated', {
-              count: engine.comboCount,
-              multiplier: comboMult,
-            });
-            this.bus.emit('wave:updated', {
-              waveNum: save.wave,
-              damageDealt: waveSystem.waveDamageDealt,
-              totalHP: waveSystem.waveTotalHP,
-            });
+            if (b.pierceLeft > 0) {
+              b.pierceLeft -= 1;
+            } else {
+              consumeBullet = true;
+            }
             break;
           }
         }
   
-        if (hit) {
+        if (consumeBullet) {
           bullets.splice(i, 1);
           bulletPool.release(b);
         }
@@ -1630,7 +2037,6 @@
         const childSize = rock.size - 1;
         const childHp = Math.max(1, Math.floor(rock.maxHp * 0.5));
         const spreadVx = (rock.variant === 'fast' ? 115 : 80) + Math.random() * 35;
-        // Asymmetric vertical pop velocities so split halves land at different times
         const popVyLeft = -315 - Math.random() * 45;
         const popVyRight = -225 - Math.random() * 40;
         const childVariant =
@@ -1667,7 +2073,11 @@
   
       achievementTracker.checkUnlockables();
   
-      if (rocks.length === 0 && waveSystem.waveRocksToSpawn.length === 0 && engine.gameState === 'PLAYING') {
+      if (
+        rocks.length === 0 &&
+        waveSystem.waveRocksToSpawn.length === 0 &&
+        engine.gameState === 'PLAYING'
+      ) {
         engine.onWaveComplete();
       }
     }
@@ -1772,6 +2182,10 @@
   
       this.activePowerups = {
         rapidFire: 0,
+        spreadShot: 0,
+        explosiveRounds: 0,
+        piercingLaser: 0,
+        giantBullets: 0,
         shield: 0,
         magnet: 0,
         freeze: 0,
@@ -1836,10 +2250,12 @@
   
     // --- Computed Stats ---
     getFireRateShotsPerSec() {
-      return getFireRateShotsPerSec(
+      const variety = this.saveManager.getActiveCannon();
+      const base = getFireRateShotsPerSec(
         this.saveManager.state.upgrades.fireRate,
         this.activePowerups.rapidFire > 0
       );
+      return base * (variety.fireRateMult || 1);
     }
   
     getBarrelCount() {
@@ -1847,8 +2263,10 @@
     }
   
     getDroneCount() {
+      const addon = this.saveManager.getActiveAddon();
+      if (addon.id !== 'wingmanDrones') return 0;
       const save = this.saveManager.state;
-      return getDroneCount(save.stats.highestWave, save.upgrades.firePower);
+      return Math.max(1, getDroneCount(save.stats.highestWave, save.upgrades.firePower));
     }
   
     getBulletDamage() {
@@ -2235,6 +2653,15 @@
           this.cannon.droneCooldown = COMBAT.DRONE_FIRE_INTERVAL;
           this.combatSystem.fireDrones(this);
         }
+  
+        if (
+          this.cannon.teslaCooldown <= 0 &&
+          this.saveManager.getActiveAddon().id === 'teslaCoil' &&
+          this.rocks.length > 0
+        ) {
+          this.cannon.teslaCooldown = 1.3;
+          this.combatSystem.fireTeslaCoil(this);
+        }
       }
   
       if (this.gameState === 'PLAYING') {
@@ -2501,8 +2928,16 @@
           continue;
         }
   
-        const grad = ctx.createLinearGradient(b.x, b.y - 10, b.x, b.y + 10);
-        if (b.overdrive) {
+        const grad = ctx.createLinearGradient(b.x, b.y - 12, b.x, b.y + 12);
+        if (b.isPierce) {
+          grad.addColorStop(0, '#ffffff');
+          grad.addColorStop(0.4, '#d980fa');
+          grad.addColorStop(1, '#8e44ad');
+        } else if (b.splashRadius > 0) {
+          grad.addColorStop(0, '#ffffff');
+          grad.addColorStop(0.4, '#ff7979');
+          grad.addColorStop(1, '#eb2f06');
+        } else if (b.overdrive) {
           grad.addColorStop(0, '#ffffff');
           grad.addColorStop(0.4, '#48dbfb');
           grad.addColorStop(1, '#0abde3');
@@ -2512,8 +2947,10 @@
           grad.addColorStop(1, skin.bulletBot);
         }
         ctx.fillStyle = grad;
+        const bw = b.isGiant ? 14 : 8;
+        const bh = b.isGiant ? 26 : b.isPierce ? 24 : 18;
         ctx.beginPath();
-        ctx.roundRect(b.x - 4, b.y - 10, 8, 18, 4);
+        ctx.roundRect(b.x - bw / 2, b.y - bh / 2, bw, bh, bw / 2);
         ctx.fill();
         ctx.restore();
       }
@@ -2583,7 +3020,7 @@
           ? '#2ed573'
           : r.variant === 'fast'
           ? '#ff6b6b'
-          : isFrozen
+          : isFrozen || r.chillTimer > 0
           ? '#7ed6df'
           : col.stroke;
       ctx.stroke();
@@ -2638,10 +3075,40 @@
   
     drawCannon(skin) {
       const { ctx, engine } = this;
-      const { cannon, invulnerableTimer, activePowerups } = engine;
+      const { cannon, invulnerableTimer, activePowerups, saveManager } = engine;
+      const variety = saveManager.getActiveCannon();
+      const addon = saveManager.getActiveAddon();
+  
+      // Draw Tesla Lightning Arc in world space if active
+      if (cannon.teslaArc) {
+        ctx.save();
+        ctx.strokeStyle = '#48dbfb';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(cannon.x, cannon.y - 42);
+        const midX = (cannon.x + cannon.teslaArc.targetX) / 2 + (Math.random() - 0.5) * 28;
+        const midY = (cannon.y - 42 + cannon.teslaArc.targetY) / 2;
+        ctx.lineTo(midX, midY);
+        ctx.lineTo(cannon.teslaArc.targetX, cannon.teslaArc.targetY);
+        ctx.stroke();
+        ctx.restore();
+      }
   
       ctx.save();
       ctx.translate(cannon.x, cannon.y);
+  
+      // Holo-Scope Laser Sight Add-On
+      if (addon.id === 'laserSight') {
+        ctx.save();
+        ctx.strokeStyle = 'rgba(255, 71, 87, 0.42)';
+        ctx.setLineDash([6, 6]);
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(0, -52);
+        ctx.lineTo(0, -engine.groundY);
+        ctx.stroke();
+        ctx.restore();
+      }
   
       if (invulnerableTimer > 0 || activePowerups.shield > 0) {
         const isPowerShield = activePowerups.shield > 0;
@@ -2669,14 +3136,23 @@
         ctx.restore();
       }
   
-      const barrels = engine.getBarrelCount();
-      const barrelWidth = barrels >= 3 ? 11 : 14;
+      const baseBarrels = engine.getBarrelCount();
+      const barrels = Math.max(1, baseBarrels + (variety.extraBarrels || 0));
+      const barrelWidth =
+        variety.id === 'mortar'
+          ? 20
+          : variety.id === 'railgun'
+          ? 16
+          : barrels >= 3
+          ? 10
+          : 14;
+      const barrelHeight = variety.id === 'railgun' ? 38 : variety.id === 'mortar' ? 26 : 30;
       const spacing = 10;
       const totalSpan = (barrels - 1) * spacing;
   
       for (let i = 0; i < barrels; i++) {
         const bx = -totalSpan / 2 + i * spacing - barrelWidth / 2;
-        const by = -48 + cannon.recoil;
+        const by = -20 - barrelHeight + cannon.recoil;
   
         const bGrad = ctx.createLinearGradient(bx, by, bx + barrelWidth, by);
         bGrad.addColorStop(0, '#576574');
@@ -2685,11 +3161,36 @@
   
         ctx.fillStyle = bGrad;
         ctx.beginPath();
-        ctx.roundRect(bx, by, barrelWidth, 30, 4);
+        ctx.roundRect(bx, by, barrelWidth, barrelHeight, 4);
         ctx.fill();
   
         ctx.fillStyle = skin.rim;
         ctx.fillRect(bx - 1, by, barrelWidth + 2, 5);
+      }
+  
+      // Bumper Buzzsaw Add-On
+      if (addon.id === 'sawBlade') {
+        ctx.save();
+        ctx.translate(0, -34);
+        ctx.rotate(cannon.sawAngle);
+        ctx.globalAlpha = cannon.sawCooldown > 0 ? 0.35 : 0.95;
+        ctx.beginPath();
+        ctx.arc(0, 0, 18, 0, Math.PI * 2);
+        ctx.strokeStyle = '#ff9f1a';
+        ctx.lineWidth = 3.5;
+        ctx.setLineDash([5, 4]);
+        ctx.stroke();
+        ctx.restore();
+      }
+  
+      // Arc Tesla Pylon Add-On
+      if (addon.id === 'teslaCoil') {
+        ctx.save();
+        ctx.fillStyle = '#48dbfb';
+        ctx.beginPath();
+        ctx.arc(0, -38, 6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
       }
   
       const bodyGrad = ctx.createLinearGradient(-18, -32, 18, -8);
@@ -2700,7 +3201,7 @@
       ctx.roundRect(-20, -30 + cannon.recoil * 0.4, 40, 22, 9);
       ctx.fill();
       ctx.lineWidth = 2;
-      ctx.strokeStyle = skin.stroke;
+      ctx.strokeStyle = addon.id === 'cryoCore' ? '#7ed6df' : skin.stroke;
       ctx.stroke();
   
       this.drawWheel(-17, -11, 11, cannon.wheelAngle, skin.wheelRim);
@@ -3618,8 +4119,73 @@
   
     renderSkinsModal() {
       const save = this.engine.saveManager.state;
+      const varietiesListEl = document.getElementById('cannon-varieties-list');
+      const addonsListEl = document.getElementById('cannon-addons-list');
       const skinsListEl = document.getElementById('cannon-skins-list');
       const themesListEl = document.getElementById('arena-themes-list');
+  
+      if (varietiesListEl) {
+        varietiesListEl.innerHTML = CANNON_VARIETIES.map((cv) => {
+          const unlocked = cv.isUnlocked(save);
+          const selected = save.equipped.cannon === cv.id;
+          return `<button class="unlock-item ${selected ? 'selected' : ''} ${
+            unlocked ? '' : 'locked-skin'
+          }" data-cannon="${cv.id}">
+            <div class="unlock-top">
+              <span style="font-size:18px">${cv.icon}</span>
+              <span class="unlock-status">${
+                selected ? 'EQUIPPED' : unlocked ? 'UNLOCKED' : '🔒 LOCKED'
+              }</span>
+            </div>
+            <div class="unlock-name">${cv.name}</div>
+            <div class="unlock-req">${unlocked ? cv.desc : cv.reqText}</div>
+          </button>`;
+        }).join('');
+  
+        varietiesListEl.querySelectorAll('[data-cannon]').forEach((btn) => {
+          btn.onclick = () => {
+            const id = btn.getAttribute('data-cannon');
+            const obj = CANNON_VARIETIES.find((c) => c.id === id);
+            if (!obj || !obj.isUnlocked(save)) return;
+            save.equipped.cannon = id;
+            this.engine.saveManager.persist();
+            this.audioService.playUpgrade();
+            this.updateUpgradeButtons();
+            this.renderSkinsModal();
+          };
+        });
+      }
+  
+      if (addonsListEl) {
+        addonsListEl.innerHTML = CANNON_ADDONS.map((ad) => {
+          const unlocked = ad.isUnlocked(save);
+          const selected = save.equipped.addon === ad.id;
+          return `<button class="unlock-item ${selected ? 'selected' : ''} ${
+            unlocked ? '' : 'locked-skin'
+          }" data-addon="${ad.id}">
+            <div class="unlock-top">
+              <span style="font-size:18px">${ad.icon}</span>
+              <span class="unlock-status">${
+                selected ? 'EQUIPPED' : unlocked ? 'UNLOCKED' : '🔒 LOCKED'
+              }</span>
+            </div>
+            <div class="unlock-name">${ad.name}</div>
+            <div class="unlock-req">${unlocked ? ad.desc : ad.reqText}</div>
+          </button>`;
+        }).join('');
+  
+        addonsListEl.querySelectorAll('[data-addon]').forEach((btn) => {
+          btn.onclick = () => {
+            const id = btn.getAttribute('data-addon');
+            const obj = CANNON_ADDONS.find((a) => a.id === id);
+            if (!obj || !obj.isUnlocked(save)) return;
+            save.equipped.addon = id;
+            this.engine.saveManager.persist();
+            this.audioService.playUpgrade();
+            this.renderSkinsModal();
+          };
+        });
+      }
   
       skinsListEl.innerHTML = CANNON_SKINS.map((sk) => {
         const unlocked = sk.isUnlocked(save);

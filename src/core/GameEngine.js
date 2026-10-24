@@ -47,6 +47,10 @@ export class GameEngine {
 
     this.activePowerups = {
       rapidFire: 0,
+      spreadShot: 0,
+      explosiveRounds: 0,
+      piercingLaser: 0,
+      giantBullets: 0,
       shield: 0,
       magnet: 0,
       freeze: 0,
@@ -111,10 +115,12 @@ export class GameEngine {
 
   // --- Computed Stats ---
   getFireRateShotsPerSec() {
-    return getFireRateShotsPerSec(
+    const variety = this.saveManager.getActiveCannon();
+    const base = getFireRateShotsPerSec(
       this.saveManager.state.upgrades.fireRate,
       this.activePowerups.rapidFire > 0
     );
+    return base * (variety.fireRateMult || 1);
   }
 
   getBarrelCount() {
@@ -122,8 +128,10 @@ export class GameEngine {
   }
 
   getDroneCount() {
+    const addon = this.saveManager.getActiveAddon();
+    if (addon.id !== 'wingmanDrones') return 0;
     const save = this.saveManager.state;
-    return getDroneCount(save.stats.highestWave, save.upgrades.firePower);
+    return Math.max(1, getDroneCount(save.stats.highestWave, save.upgrades.firePower));
   }
 
   getBulletDamage() {
@@ -509,6 +517,15 @@ export class GameEngine {
       if (this.cannon.droneCooldown <= 0 && this.getDroneCount() > 0) {
         this.cannon.droneCooldown = COMBAT.DRONE_FIRE_INTERVAL;
         this.combatSystem.fireDrones(this);
+      }
+
+      if (
+        this.cannon.teslaCooldown <= 0 &&
+        this.saveManager.getActiveAddon().id === 'teslaCoil' &&
+        this.rocks.length > 0
+      ) {
+        this.cannon.teslaCooldown = 1.3;
+        this.combatSystem.fireTeslaCoil(this);
       }
     }
 

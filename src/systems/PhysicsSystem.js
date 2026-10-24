@@ -21,13 +21,18 @@ export class PhysicsSystem {
       invulnerableTimer,
       activePowerups,
       combatSystem,
+      saveManager,
     } = engine;
 
-    const timeScale = activePowerups.freeze > 0 ? PHYSICS.CRYO_TIME_SCALE : 1;
-    const rDt = dt * timeScale;
+    const addon = saveManager.getActiveAddon();
+    const globalScale = activePowerups.freeze > 0 ? PHYSICS.CRYO_TIME_SCALE : 1;
 
     for (let i = rocks.length - 1; i >= 0; i--) {
       const r = rocks[i];
+      if (r.chillTimer > 0) r.chillTimer = Math.max(0, r.chillTimer - dt);
+      const rockScale = r.chillTimer > 0 ? Math.min(globalScale, 0.55) : globalScale;
+      const rDt = dt * rockScale;
+
       r.vy += PHYSICS.GRAVITY * rDt;
       r.x += r.vx * rDt;
       r.y += r.vy * rDt;
@@ -69,7 +74,7 @@ export class PhysicsSystem {
         r.vAngle = -Math.abs(r.vAngle);
       }
 
-      // Ground bounce (varied per rock + slight per-bounce jitter to prevent synchronized walls)
+      // Ground bounce (varied per rock + Sub-Zero Bumper add-on frost effect)
       if (r.y + r.radius >= groundY) {
         r.y = groundY - r.radius;
         const baseBounce = ROCK_BOUNCE_VELOCITIES[r.size] || -550;
@@ -79,20 +84,39 @@ export class PhysicsSystem {
         r.vy = baseBounce * (varCfg.bounceMultiplier || 1) * perRockMult * liveJitter;
         r.hitScale = 1.1;
         engine.addParticles(r.x, groundY, 'rgba(255,255,255,0.35)', 4, 70);
+
+        // Sub-Zero Bumper Add-on: Floor bounce chills & damages rock
+        if (gameState === 'PLAYING' && addon.id === 'cryoCore') {
+          r.chillTimer = 1.6;
+          const frostDmg = Math.max(1, Math.round(engine.getBulletDamage() * 1.8));
+          combatSystem.applyDamageToRock(r, frostDmg, engine, { isCrit: false });
+          if (!rocks.includes(r)) continue;
+        }
       }
 
-      // Cannon collision
+      // Cannon collision (with Force Shield & Bumper Buzzsaw Add-on support)
       if (gameState === 'PLAYING') {
         const cannonCenterY = cannon.y - 24;
         const distSq = (r.x - cannon.x) ** 2 + (r.y - cannonCenterY) ** 2;
         const hitDist = r.radius + cannon.radius - 7;
         if (distSq <= hitDist * hitDist) {
           if (invulnerableTimer > 0 || activePowerups.shield > 0) {
-            r.vy = -510;
+            r.vy = -520;
             r.y = Math.min(r.y, cannonCenterY - hitDist - 4);
             this.bus.emit('sfx:hit', { hpRatio: 0.2, armored: true });
             engine.triggerShake(6, 0.14);
             engine.addParticles(r.x, r.y + r.radius * 0.5, '#2ed573', 10, 180);
+          } else if (addon.id === 'sawBlade' && cannon.sawCooldown <= 0) {
+            // Bumper Buzzsaw slices rock and bounces it skyward!
+            cannon.sawCooldown = 2.5;
+            r.vy = -540;
+            r.y = Math.min(r.y, cannonCenterY - hitDist - 6);
+            this.bus.emit('sfx:hit', { hpRatio: 0.1, armored: true });
+            engine.triggerShake(8, 0.18);
+            engine.addParticles(cannon.x, cannon.y - 36, '#ff9f1a', 14, 210);
+            engine.addFloatingText(cannon.x, cannon.y - 54, '⚙️ SAW PARRY!', '#ff9f1a', 14);
+            const sawDmg = Math.max(2, Math.round(engine.getBulletDamage() * 4.5));
+            combatSystem.applyDamageToRock(r, sawDmg, engine, { isCrit: true });
           } else {
             engine.triggerGameOver();
             break;

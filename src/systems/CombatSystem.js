@@ -1,6 +1,7 @@
 /**
- * CombatSystem - Handles volley firing, Wingman Drone targeting, Critical Hits,
- * Combo multipliers, Ultimate Supernova Beam, armor cracking, rock splitting, and boss skills.
+ * CombatSystem - Handles volley firing (across all Cannon Varieties & Power-Ups),
+ * Wingman Drone targeting, Tesla Pylon zaps, Critical Hits, Combo multipliers,
+ * Ultimate Supernova Beam, armor cracking, rock splitting, and boss skills.
  */
 
 import { PHYSICS, COMBAT } from '../config/constants.js';
@@ -15,29 +16,81 @@ export class CombatSystem {
   }
 
   fireVolley(engine) {
-    const { cannon, bullets, bulletPool } = engine;
-    const barrels = engine.getBarrelCount();
+    const { cannon, bullets, bulletPool, activePowerups, saveManager } = engine;
+    const variety = saveManager.getActiveCannon();
+    const baseBarrels = engine.getBarrelCount();
+    const barrels = Math.max(1, baseBarrels + (variety.extraBarrels || 0));
     const spacing = 11;
     const totalSpan = (barrels - 1) * spacing;
-    const isOverdrive = engine.activePowerups.rapidFire > 0;
+
+    const isOverdrive = activePowerups.rapidFire > 0;
+    const isGiant = activePowerups.giantBullets > 0;
+    const isPierce = activePowerups.piercingLaser > 0;
+    const isExplosive = activePowerups.explosiveRounds > 0;
+    const isSpreadPowerup = activePowerups.spreadShot > 0;
+
+    const speed =
+      variety.id === 'railgun'
+        ? -980
+        : isOverdrive
+        ? PHYSICS.BULLET_SPEED_OVERDRIVE
+        : PHYSICS.BULLET_SPEED_NORMAL;
+
+    const pierceLeft = (isPierce ? 3 : 0) + (variety.pierceCount || 0);
+    const splashRadius = isExplosive ? 95 : variety.splashRadius || 0;
+    const dmgRatio = (variety.damageMult || 1) * (isGiant ? 2.0 : 1.0);
+    const bulletRadius = isGiant ? 10 : variety.id === 'railgun' ? 7 : isOverdrive ? 6.2 : 5.5;
 
     for (let i = 0; i < barrels; i++) {
       const offsetX = -totalSpan / 2 + i * spacing;
+      const normIdx = barrels > 1 ? i / (barrels - 1) - 0.5 : 0;
+      const angle = normIdx * (variety.spreadAngle || 0);
+      const vx = Math.sin(angle) * Math.abs(speed) + offsetX * 1.2;
+      const vy = -Math.cos(angle) * Math.abs(speed);
+
       bullets.push(
         bulletPool.acquire({
           x: cannon.x + offsetX,
           y: cannon.y - 48,
-          vx: offsetX * 1.4,
-          vy: isOverdrive ? PHYSICS.BULLET_SPEED_OVERDRIVE : PHYSICS.BULLET_SPEED_NORMAL,
-          radius: isOverdrive ? 6.2 : 5.5,
+          vx,
+          vy,
+          radius: bulletRadius,
           overdrive: isOverdrive,
+          isGiant,
+          isPierce: pierceLeft > 0,
+          pierceLeft,
+          splashRadius,
+          lastHitRock: null,
           isDrone: false,
-          damageRatio: 1.0,
+          damageRatio: dmgRatio,
         })
       );
     }
 
-    cannon.recoil = 6;
+    // Spread Fan Power-Up adds 2 angled wing shots
+    if (isSpreadPowerup) {
+      for (const sideAngle of [-0.26, 0.26]) {
+        bullets.push(
+          bulletPool.acquire({
+            x: cannon.x,
+            y: cannon.y - 46,
+            vx: Math.sin(sideAngle) * Math.abs(speed),
+            vy: -Math.cos(sideAngle) * Math.abs(speed),
+            radius: bulletRadius * 0.9,
+            overdrive: isOverdrive,
+            isGiant,
+            isPierce: pierceLeft > 0,
+            pierceLeft,
+            splashRadius,
+            lastHitRock: null,
+            isDrone: false,
+            damageRatio: dmgRatio * 0.85,
+          })
+        );
+      }
+    }
+
+    cannon.recoil = variety.id === 'railgun' ? 9 : 6;
     cannon.muzzleFlash = 1;
     this.bus.emit('sfx:shoot', { overdrive: isOverdrive });
   }
@@ -47,7 +100,6 @@ export class CombatSystem {
     const droneCount = engine.getDroneCount();
     if (droneCount <= 0 || rocks.length === 0) return;
 
-    // Target the boulder closest to the ground
     let target = rocks[0];
     for (const r of rocks) {
       if (r.y + r.radius > target.y + target.radius) {
@@ -73,11 +125,100 @@ export class CombatSystem {
           vy: (dy / dist) * COMBAT.DRONE_BULLET_SPEED,
           radius: 4.8,
           overdrive: false,
+          isGiant: false,
+          isPierce: false,
+          pierceLeft: 0,
+          splashRadius: 0,
+          lastHitRock: null,
           isDrone: true,
           damageRatio: COMBAT.DRONE_DAMAGE_RATIO,
         })
       );
     }
+  }
+
+  fireTeslaCoil(engine) {
+    const { cannon, rocks } = engine;
+    if (rocks.length === 0) return;
+    const target = rocks[Math.floor(Math.random() * rocks.length)];
+    const zapDmg = Math.max(2, Math.round(engine.getBulletDamage() * 2.2));
+
+    cannon.teslaArc = {
+      targetX: target.x,
+      targetY: target.y,
+      timer: 0.18,
+    };
+
+    this.applyDamageToRock(target, zapDmg, engine, { isCrit: false, isZap: true });
+    engine.addParticles(target.x, target.y, '#48dbfb', 6, 150);
+  }
+
+  applyDamageToRock(r, rawDmg, engine, { isCrit = false, isZap = false } = {}) {
+    const { rocks, saveManager, waveSystem } = engine;
+    const save = saveManager.state;
+    const idx = rocks.indexOf(r);
+    if (idx === -1) return 0;
+
+    if (r.bossShieldTimer > 0) {
+      this.bus.emit('sfx:hit', { hpRatio: 1, armored: true });
+      return 0;
+    }
+
+    const hasIntactArmor = r.variant === 'armored' && !r.armorBroken;
+    const armorScale = ROCK_VARIANTS.armored.armorDamageScale;
+    const afterArmor = hasIntactArmor ? Math.max(1, Math.round(rawDmg * armorScale)) : rawDmg;
+    const actualDmg = Math.min(r.hp, afterArmor);
+
+    r.hp -= actualDmg;
+
+    engine.comboCount += 1;
+    engine.comboTimer = COMBAT.COMBO_DECAY_TIME;
+    const comboMult = getComboMultiplier(engine.comboCount);
+    const scoreGain = Math.round(actualDmg * comboMult);
+
+    engine.score += scoreGain;
+    waveSystem.waveDamageDealt += actualDmg;
+    if (engine.score > save.bestScore) {
+      save.bestScore = engine.score;
+    }
+
+    engine.addUltimateCharge(COMBAT.ULTIMATE_CHARGE_PER_HIT);
+
+    if (isCrit) {
+      engine.addFloatingText(r.x, r.y - 12, `💥 ${formatNum(actualDmg)}!`, '#ff4757', 14);
+    } else if (isZap) {
+      engine.addFloatingText(r.x, r.y - 10, `⚡ ${formatNum(actualDmg)}`, '#48dbfb', 13);
+    }
+
+    if (
+      hasIntactArmor &&
+      r.hp <= r.maxHp * ROCK_VARIANTS.armored.armorBreakThreshold &&
+      r.hp > 0
+    ) {
+      r.armorBroken = true;
+      engine.addParticles(r.x, r.y, '#dfe4ea', 14, 200);
+      engine.addFloatingText(r.x, r.y - r.radius, 'ARMOR CRACKED!', '#dfe4ea', 13);
+    }
+
+    r.hitScale = isCrit ? 1.22 : 1.15;
+    r.hitFlash = 0.22;
+
+    if (r.hp <= 0) {
+      this.destroyRock(r, idx, engine, false);
+    }
+
+    this.bus.emit('hud:scoreUpdated');
+    this.bus.emit('combo:updated', {
+      count: engine.comboCount,
+      multiplier: comboMult,
+    });
+    this.bus.emit('wave:updated', {
+      waveNum: save.wave,
+      damageDealt: waveSystem.waveDamageDealt,
+      totalHP: waveSystem.waveTotalHP,
+    });
+
+    return actualDmg;
   }
 
   triggerUltimate(engine) {
@@ -88,7 +229,13 @@ export class CombatSystem {
     engine.invulnerableTimer = Math.max(engine.invulnerableTimer, 2.0);
     engine.triggerShake(15, 0.4);
     engine.addShockwave(engine.cannon.x, engine.cannon.y - 40, 420, 'rgba(72, 219, 251, 0.9)');
-    engine.addFloatingText(engine.width / 2, engine.height * 0.36, '☄️ ORBITAL SUPERNOVA!', '#48dbfb', 20);
+    engine.addFloatingText(
+      engine.width / 2,
+      engine.height * 0.36,
+      '☄️ ORBITAL SUPERNOVA!',
+      '#48dbfb',
+      20
+    );
 
     const ultDamage = Math.max(15, Math.round(engine.getBulletDamage() * 14));
     const save = engine.saveManager.state;
@@ -127,9 +274,16 @@ export class CombatSystem {
   }
 
   updateBullets(dt, engine) {
-    const { bullets, bulletPool, rocks, width, saveManager, waveSystem } = engine;
-    const save = saveManager.state;
+    const { bullets, bulletPool, rocks, width, saveManager } = engine;
     const baseBulletDmg = engine.getBulletDamage();
+    const variety = saveManager.getActiveCannon();
+    const addon = saveManager.getActiveAddon();
+
+    const critChance =
+      COMBAT.CRIT_CHANCE +
+      (variety.critBonus || 0) +
+      (addon.id === 'laserSight' ? 0.18 : 0);
+    const critMult = COMBAT.CRIT_MULTIPLIER + (addon.id === 'laserSight' ? 0.5 : 0);
 
     for (let i = bullets.length - 1; i >= 0; i--) {
       const b = bullets[i];
@@ -142,87 +296,57 @@ export class CombatSystem {
         continue;
       }
 
-      let hit = false;
+      let consumeBullet = false;
       for (let j = rocks.length - 1; j >= 0; j--) {
         const r = rocks[j];
+        if (b.lastHitRock === r) continue;
+
         const distSq = (b.x - r.x) ** 2 + (b.y - r.y) ** 2;
         if (distSq <= (r.radius + b.radius) ** 2) {
-          hit = true;
+          b.lastHitRock = r;
 
-          if (r.bossShieldTimer > 0) {
-            this.bus.emit('sfx:hit', { hpRatio: 1, armored: true });
-            engine.addParticles(b.x, b.y, '#48dbfb', 4, 110);
-            break;
-          }
-
-          // Roll Critical Hit
-          const isCrit = !b.isDrone && Math.random() < COMBAT.CRIT_CHANCE;
-          const critMult = isCrit ? COMBAT.CRIT_MULTIPLIER : 1.0;
-          const scaledDmg = Math.max(1, Math.round(baseBulletDmg * (b.damageRatio || 1) * critMult));
+          const isCrit = !b.isDrone && Math.random() < critChance;
+          const mult = isCrit ? critMult : 1.0;
+          const scaledDmg = Math.max(1, Math.round(baseBulletDmg * (b.damageRatio || 1) * mult));
 
           const hasIntactArmor = r.variant === 'armored' && !r.armorBroken;
-          const armorScale = ROCK_VARIANTS.armored.armorDamageScale;
-          const rawDmg = hasIntactArmor ? Math.max(1, Math.round(scaledDmg * armorScale)) : scaledDmg;
-          const actualDmg = Math.min(r.hp, rawDmg);
-
-          r.hp -= actualDmg;
-
-          // Build Combo & Ultimate Charge
-          engine.comboCount += 1;
-          engine.comboTimer = COMBAT.COMBO_DECAY_TIME;
-          const comboMult = getComboMultiplier(engine.comboCount);
-          const scoreGain = Math.round(actualDmg * comboMult);
-
-          engine.score += scoreGain;
-          waveSystem.waveDamageDealt += actualDmg;
-          if (engine.score > save.bestScore) {
-            save.bestScore = engine.score;
-          }
-
-          engine.addUltimateCharge(COMBAT.ULTIMATE_CHARGE_PER_HIT);
-
-          if (isCrit) {
-            engine.addFloatingText(
-              b.x,
-              b.y - 12,
-              `💥 ${formatNum(actualDmg)}!`,
-              '#ff4757',
-              14
-            );
-          }
-
-          if (hasIntactArmor && r.hp <= r.maxHp * ROCK_VARIANTS.armored.armorBreakThreshold && r.hp > 0) {
-            r.armorBroken = true;
-            engine.addParticles(r.x, r.y, '#dfe4ea', 14, 200);
-            engine.addFloatingText(r.x, r.y - r.radius, 'ARMOR CRACKED!', '#dfe4ea', 13);
-          }
-
-          r.hitScale = isCrit ? 1.22 : 1.15;
-          r.hitFlash = 0.22;
-          if (r.vy > -120) r.vy -= 12;
+          if (r.vy > -120) r.vy -= b.isGiant ? 28 : 12;
 
           this.bus.emit('sfx:hit', { hpRatio: r.hp / r.maxHp, armored: hasIntactArmor });
-          engine.addParticles(b.x, b.y, isCrit ? '#ff4757' : hasIntactArmor ? '#dfe4ea' : '#fffa65', isCrit ? 6 : 3, 110);
+          engine.addParticles(
+            b.x,
+            b.y,
+            isCrit ? '#ff4757' : hasIntactArmor ? '#dfe4ea' : '#fffa65',
+            isCrit ? 6 : 3,
+            110
+          );
 
-          if (r.hp <= 0) {
-            this.destroyRock(r, j, engine, false);
+          this.applyDamageToRock(r, scaledDmg, engine, { isCrit });
+
+          // Area Splash Damage (Explosive Rounds Power-Up or Siege Blast Cannon)
+          if (b.splashRadius > 0) {
+            engine.addShockwave(b.x, b.y, b.splashRadius, 'rgba(255, 118, 117, 0.75)');
+            const splashDmg = Math.max(1, Math.round(scaledDmg * 0.5));
+            for (let k = rocks.length - 1; k >= 0; k--) {
+              const other = rocks[k];
+              if (!other || other === r) continue;
+              const d = Math.hypot(other.x - b.x, other.y - b.y);
+              if (d <= b.splashRadius + other.radius) {
+                this.applyDamageToRock(other, splashDmg, engine, { isCrit: false });
+              }
+            }
           }
 
-          this.bus.emit('hud:scoreUpdated');
-          this.bus.emit('combo:updated', {
-            count: engine.comboCount,
-            multiplier: comboMult,
-          });
-          this.bus.emit('wave:updated', {
-            waveNum: save.wave,
-            damageDealt: waveSystem.waveDamageDealt,
-            totalHP: waveSystem.waveTotalHP,
-          });
+          if (b.pierceLeft > 0) {
+            b.pierceLeft -= 1;
+          } else {
+            consumeBullet = true;
+          }
           break;
         }
       }
 
-      if (hit) {
+      if (consumeBullet) {
         bullets.splice(i, 1);
         bulletPool.release(b);
       }
@@ -257,7 +381,6 @@ export class CombatSystem {
       const childSize = rock.size - 1;
       const childHp = Math.max(1, Math.floor(rock.maxHp * 0.5));
       const spreadVx = (rock.variant === 'fast' ? 115 : 80) + Math.random() * 35;
-      // Asymmetric vertical pop velocities so split halves land at different times
       const popVyLeft = -315 - Math.random() * 45;
       const popVyRight = -225 - Math.random() * 40;
       const childVariant =
@@ -294,7 +417,11 @@ export class CombatSystem {
 
     achievementTracker.checkUnlockables();
 
-    if (rocks.length === 0 && waveSystem.waveRocksToSpawn.length === 0 && engine.gameState === 'PLAYING') {
+    if (
+      rocks.length === 0 &&
+      waveSystem.waveRocksToSpawn.length === 0 &&
+      engine.gameState === 'PLAYING'
+    ) {
       engine.onWaveComplete();
     }
   }

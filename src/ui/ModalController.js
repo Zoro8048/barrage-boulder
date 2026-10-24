@@ -6,6 +6,8 @@
 import { UPGRADE_TYPES } from '../config/upgrades.js';
 import { CANNON_SKINS } from '../config/skins.js';
 import { ARENA_THEMES } from '../config/themes.js';
+import { CANNON_VARIETIES } from '../config/cannons.js';
+import { CANNON_ADDONS } from '../config/addons.js';
 import { ACHIEVEMENTS } from '../config/achievements.js';
 import {
   getUpgradeCost,
@@ -280,8 +282,73 @@ export class ModalController {
 
   renderSkinsModal() {
     const save = this.engine.saveManager.state;
+    const varietiesListEl = document.getElementById('cannon-varieties-list');
+    const addonsListEl = document.getElementById('cannon-addons-list');
     const skinsListEl = document.getElementById('cannon-skins-list');
     const themesListEl = document.getElementById('arena-themes-list');
+
+    if (varietiesListEl) {
+      varietiesListEl.innerHTML = CANNON_VARIETIES.map((cv) => {
+        const unlocked = cv.isUnlocked(save);
+        const selected = save.equipped.cannon === cv.id;
+        return `<button class="unlock-item ${selected ? 'selected' : ''} ${
+          unlocked ? '' : 'locked-skin'
+        }" data-cannon="${cv.id}">
+          <div class="unlock-top">
+            <span style="font-size:18px">${cv.icon}</span>
+            <span class="unlock-status">${
+              selected ? 'EQUIPPED' : unlocked ? 'UNLOCKED' : '🔒 LOCKED'
+            }</span>
+          </div>
+          <div class="unlock-name">${cv.name}</div>
+          <div class="unlock-req">${unlocked ? cv.desc : cv.reqText}</div>
+        </button>`;
+      }).join('');
+
+      varietiesListEl.querySelectorAll('[data-cannon]').forEach((btn) => {
+        btn.onclick = () => {
+          const id = btn.getAttribute('data-cannon');
+          const obj = CANNON_VARIETIES.find((c) => c.id === id);
+          if (!obj || !obj.isUnlocked(save)) return;
+          save.equipped.cannon = id;
+          this.engine.saveManager.persist();
+          this.audioService.playUpgrade();
+          this.updateUpgradeButtons();
+          this.renderSkinsModal();
+        };
+      });
+    }
+
+    if (addonsListEl) {
+      addonsListEl.innerHTML = CANNON_ADDONS.map((ad) => {
+        const unlocked = ad.isUnlocked(save);
+        const selected = save.equipped.addon === ad.id;
+        return `<button class="unlock-item ${selected ? 'selected' : ''} ${
+          unlocked ? '' : 'locked-skin'
+        }" data-addon="${ad.id}">
+          <div class="unlock-top">
+            <span style="font-size:18px">${ad.icon}</span>
+            <span class="unlock-status">${
+              selected ? 'EQUIPPED' : unlocked ? 'UNLOCKED' : '🔒 LOCKED'
+            }</span>
+          </div>
+          <div class="unlock-name">${ad.name}</div>
+          <div class="unlock-req">${unlocked ? ad.desc : ad.reqText}</div>
+        </button>`;
+      }).join('');
+
+      addonsListEl.querySelectorAll('[data-addon]').forEach((btn) => {
+        btn.onclick = () => {
+          const id = btn.getAttribute('data-addon');
+          const obj = CANNON_ADDONS.find((a) => a.id === id);
+          if (!obj || !obj.isUnlocked(save)) return;
+          save.equipped.addon = id;
+          this.engine.saveManager.persist();
+          this.audioService.playUpgrade();
+          this.renderSkinsModal();
+        };
+      });
+    }
 
     skinsListEl.innerHTML = CANNON_SKINS.map((sk) => {
       const unlocked = sk.isUnlocked(save);

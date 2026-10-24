@@ -1,5 +1,5 @@
 /**
- * Unlockable Visual Arena Themes Registry
+ * Unlockable Visual Arena Themes Registry (7 Themes)
  */
 
 export const ARENA_THEMES = [
@@ -36,9 +36,25 @@ export const ARENA_THEMES = [
     isUnlocked: (s) => s.stats.highestWave >= 3,
   },
   {
+    id: 'toxic',
+    name: 'Bio-Lab Reactor',
+    reqText: 'Reach Wave 5',
+    swatch: 'linear-gradient(135deg, #0b2418, #a3cb38)',
+    skyTop: '#071710',
+    skyMid: '#113322',
+    skyBot: '#1c5236',
+    mtnBack: '#143d28',
+    mtnFront: '#0c291a',
+    grassTop: '#a3cb38',
+    grassSub: '#759622',
+    earthTop: '#102b1d',
+    earthBot: '#07140d',
+    isUnlocked: (s) => s.stats.highestWave >= 5,
+  },
+  {
     id: 'arctic',
     name: 'Frostbite Tundra',
-    reqText: 'Reach Wave 6',
+    reqText: 'Reach Wave 7',
     swatch: 'linear-gradient(135deg, #0a2342, #7ed6df)',
     skyTop: '#07162c',
     skyMid: '#12355b',
@@ -49,7 +65,7 @@ export const ARENA_THEMES = [
     grassSub: '#22a6b3',
     earthTop: '#132a42',
     earthBot: '#091522',
-    isUnlocked: (s) => s.stats.highestWave >= 6,
+    isUnlocked: (s) => s.stats.highestWave >= 7,
   },
   {
     id: 'synthwave',
@@ -82,5 +98,21 @@ export const ARENA_THEMES = [
     earthTop: '#240b0b',
     earthBot: '#0f0404',
     isUnlocked: (s) => s.stats.highestWave >= 15,
+  },
+  {
+    id: 'starlight',
+    name: 'Deep Nebula',
+    reqText: 'Reach Wave 20',
+    swatch: 'linear-gradient(135deg, #060919, #48dbfb)',
+    skyTop: '#040611',
+    skyMid: '#0e1638',
+    skyBot: '#1d2d6e',
+    mtnBack: '#152254',
+    mtnFront: '#0c1436',
+    grassTop: '#48dbfb',
+    grassSub: '#0abde3',
+    earthTop: '#0e183b',
+    earthBot: '#050917',
+    isUnlocked: (s) => s.stats.highestWave >= 20,
   },
 ];

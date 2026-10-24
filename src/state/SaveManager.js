@@ -6,6 +6,8 @@
 import { SAVE_KEY, SAVE_SCHEMA_VERSION } from '../config/constants.js';
 import { CANNON_SKINS } from '../config/skins.js';
 import { ARENA_THEMES } from '../config/themes.js';
+import { CANNON_VARIETIES } from '../config/cannons.js';
+import { CANNON_ADDONS } from '../config/addons.js';
 import { calculateOfflineEarnings } from './UpgradeMath.js';
 
 export function createDefaultSave(now = Date.now()) {
@@ -23,6 +25,8 @@ export function createDefaultSave(now = Date.now()) {
     equipped: {
       skin: 'classic',
       theme: 'midnight',
+      cannon: 'striker',
+      addon: 'wingmanDrones',
     },
     settings: {
       sfxVolume: 80,
@@ -106,6 +110,14 @@ export class SaveManager {
 
   getActiveTheme() {
     return ARENA_THEMES.find((t) => t.id === this.state.equipped.theme) || ARENA_THEMES[0];
+  }
+
+  getActiveCannon() {
+    return CANNON_VARIETIES.find((c) => c.id === this.state.equipped.cannon) || CANNON_VARIETIES[0];
+  }
+
+  getActiveAddon() {
+    return CANNON_ADDONS.find((a) => a.id === this.state.equipped.addon) || CANNON_ADDONS[0];
   }
 
   getPendingOfflineReward(now = Date.now()) {

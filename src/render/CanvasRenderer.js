@@ -251,8 +251,16 @@ export class CanvasRenderer {
         continue;
       }
 
-      const grad = ctx.createLinearGradient(b.x, b.y - 10, b.x, b.y + 10);
-      if (b.overdrive) {
+      const grad = ctx.createLinearGradient(b.x, b.y - 12, b.x, b.y + 12);
+      if (b.isPierce) {
+        grad.addColorStop(0, '#ffffff');
+        grad.addColorStop(0.4, '#d980fa');
+        grad.addColorStop(1, '#8e44ad');
+      } else if (b.splashRadius > 0) {
+        grad.addColorStop(0, '#ffffff');
+        grad.addColorStop(0.4, '#ff7979');
+        grad.addColorStop(1, '#eb2f06');
+      } else if (b.overdrive) {
         grad.addColorStop(0, '#ffffff');
         grad.addColorStop(0.4, '#48dbfb');
         grad.addColorStop(1, '#0abde3');
@@ -262,8 +270,10 @@ export class CanvasRenderer {
         grad.addColorStop(1, skin.bulletBot);
       }
       ctx.fillStyle = grad;
+      const bw = b.isGiant ? 14 : 8;
+      const bh = b.isGiant ? 26 : b.isPierce ? 24 : 18;
       ctx.beginPath();
-      ctx.roundRect(b.x - 4, b.y - 10, 8, 18, 4);
+      ctx.roundRect(b.x - bw / 2, b.y - bh / 2, bw, bh, bw / 2);
       ctx.fill();
       ctx.restore();
     }
@@ -333,7 +343,7 @@ export class CanvasRenderer {
         ? '#2ed573'
         : r.variant === 'fast'
         ? '#ff6b6b'
-        : isFrozen
+        : isFrozen || r.chillTimer > 0
         ? '#7ed6df'
         : col.stroke;
     ctx.stroke();
@@ -388,10 +398,40 @@ export class CanvasRenderer {
 
   drawCannon(skin) {
     const { ctx, engine } = this;
-    const { cannon, invulnerableTimer, activePowerups } = engine;
+    const { cannon, invulnerableTimer, activePowerups, saveManager } = engine;
+    const variety = saveManager.getActiveCannon();
+    const addon = saveManager.getActiveAddon();
+
+    // Draw Tesla Lightning Arc in world space if active
+    if (cannon.teslaArc) {
+      ctx.save();
+      ctx.strokeStyle = '#48dbfb';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(cannon.x, cannon.y - 42);
+      const midX = (cannon.x + cannon.teslaArc.targetX) / 2 + (Math.random() - 0.5) * 28;
+      const midY = (cannon.y - 42 + cannon.teslaArc.targetY) / 2;
+      ctx.lineTo(midX, midY);
+      ctx.lineTo(cannon.teslaArc.targetX, cannon.teslaArc.targetY);
+      ctx.stroke();
+      ctx.restore();
+    }
 
     ctx.save();
     ctx.translate(cannon.x, cannon.y);
+
+    // Holo-Scope Laser Sight Add-On
+    if (addon.id === 'laserSight') {
+      ctx.save();
+      ctx.strokeStyle = 'rgba(255, 71, 87, 0.42)';
+      ctx.setLineDash([6, 6]);
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(0, -52);
+      ctx.lineTo(0, -engine.groundY);
+      ctx.stroke();
+      ctx.restore();
+    }
 
     if (invulnerableTimer > 0 || activePowerups.shield > 0) {
       const isPowerShield = activePowerups.shield > 0;
@@ -419,14 +459,23 @@ export class CanvasRenderer {
       ctx.restore();
     }
 
-    const barrels = engine.getBarrelCount();
-    const barrelWidth = barrels >= 3 ? 11 : 14;
+    const baseBarrels = engine.getBarrelCount();
+    const barrels = Math.max(1, baseBarrels + (variety.extraBarrels || 0));
+    const barrelWidth =
+      variety.id === 'mortar'
+        ? 20
+        : variety.id === 'railgun'
+        ? 16
+        : barrels >= 3
+        ? 10
+        : 14;
+    const barrelHeight = variety.id === 'railgun' ? 38 : variety.id === 'mortar' ? 26 : 30;
     const spacing = 10;
     const totalSpan = (barrels - 1) * spacing;
 
     for (let i = 0; i < barrels; i++) {
       const bx = -totalSpan / 2 + i * spacing - barrelWidth / 2;
-      const by = -48 + cannon.recoil;
+      const by = -20 - barrelHeight + cannon.recoil;
 
       const bGrad = ctx.createLinearGradient(bx, by, bx + barrelWidth, by);
       bGrad.addColorStop(0, '#576574');
@@ -435,11 +484,36 @@ export class CanvasRenderer {
 
       ctx.fillStyle = bGrad;
       ctx.beginPath();
-      ctx.roundRect(bx, by, barrelWidth, 30, 4);
+      ctx.roundRect(bx, by, barrelWidth, barrelHeight, 4);
       ctx.fill();
 
       ctx.fillStyle = skin.rim;
       ctx.fillRect(bx - 1, by, barrelWidth + 2, 5);
+    }
+
+    // Bumper Buzzsaw Add-On
+    if (addon.id === 'sawBlade') {
+      ctx.save();
+      ctx.translate(0, -34);
+      ctx.rotate(cannon.sawAngle);
+      ctx.globalAlpha = cannon.sawCooldown > 0 ? 0.35 : 0.95;
+      ctx.beginPath();
+      ctx.arc(0, 0, 18, 0, Math.PI * 2);
+      ctx.strokeStyle = '#ff9f1a';
+      ctx.lineWidth = 3.5;
+      ctx.setLineDash([5, 4]);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // Arc Tesla Pylon Add-On
+    if (addon.id === 'teslaCoil') {
+      ctx.save();
+      ctx.fillStyle = '#48dbfb';
+      ctx.beginPath();
+      ctx.arc(0, -38, 6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
     }
 
     const bodyGrad = ctx.createLinearGradient(-18, -32, 18, -8);
@@ -450,7 +524,7 @@ export class CanvasRenderer {
     ctx.roundRect(-20, -30 + cannon.recoil * 0.4, 40, 22, 9);
     ctx.fill();
     ctx.lineWidth = 2;
-    ctx.strokeStyle = skin.stroke;
+    ctx.strokeStyle = addon.id === 'cryoCore' ? '#7ed6df' : skin.stroke;
     ctx.stroke();
 
     this.drawWheel(-17, -11, 11, cannon.wheelAngle, skin.wheelRim);

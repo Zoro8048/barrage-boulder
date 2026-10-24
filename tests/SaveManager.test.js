@@ -3,6 +3,9 @@ import assert from 'node:assert/strict';
 import { SaveManager, migrateSaveData } from '../src/state/SaveManager.js';
 import { AchievementTracker } from '../src/state/AchievementTracker.js';
 import { EventBus } from '../src/core/EventBus.js';
+import { POWERUP_META } from '../src/config/powerups.js';
+import { CANNON_VARIETIES } from '../src/config/cannons.js';
+import { CANNON_ADDONS } from '../src/config/addons.js';
 
 class MemoryStorage {
   constructor() {
@@ -31,6 +34,14 @@ test('SaveManager - migrates legacy v1 save data cleanly without losing progress
   assert.equal(migrated.upgrades.fireRate, 4);
   assert.equal(migrated.upgrades.coinValue, 1);
   assert.equal(migrated.equipped.skin, 'classic');
+  assert.equal(migrated.equipped.cannon, 'striker');
+  assert.equal(migrated.equipped.addon, 'wingmanDrones');
+});
+
+test('Catalogs - 8 Power-Ups, 5 Cannon Varieties, and 5 Tactical Add-Ons are registered', () => {
+  assert.equal(Object.keys(POWERUP_META).length, 8);
+  assert.equal(CANNON_VARIETIES.length, 5);
+  assert.equal(CANNON_ADDONS.length, 5);
 });
 
 test('SaveManager & AchievementTracker - unlocks achievements and awards coins', () => {

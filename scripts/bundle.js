@@ -18,6 +18,8 @@ const MODULE_ORDER = [
   'src/config/upgrades.js',
   'src/config/skins.js',
   'src/config/themes.js',
+  'src/config/cannons.js',
+  'src/config/addons.js',
   'src/config/powerups.js',
   'src/config/rockVariants.js',
   'src/config/achievements.js',
