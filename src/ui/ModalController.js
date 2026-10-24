@@ -31,6 +31,14 @@ export class ModalController {
     this.reviveBtn = document.getElementById('revive-btn');
     this.continueBtn = document.getElementById('continue-btn');
 
+    this.pauseModalEl = document.getElementById('pause-modal');
+    this.pauseTitleEl = document.getElementById('pause-title');
+    this.pauseScoreEl = document.getElementById('pause-score');
+    this.pauseCoinsEl = document.getElementById('pause-coins');
+    this.pauseBtn = document.getElementById('pause-btn');
+    this.resumeBtn = document.getElementById('resume-btn');
+    this.pauseLobbyBtn = document.getElementById('pause-lobby-btn');
+
     this.offlineModalEl = document.getElementById('offline-modal');
     this.offlineAmountEl = document.getElementById('offline-amount');
     this.claimOfflineBtn = document.getElementById('claim-offline-btn');
@@ -61,6 +69,7 @@ export class ModalController {
   isAnyModalOpen() {
     return (
       !this.gameoverModalEl.classList.contains('hidden') ||
+      (this.pauseModalEl && !this.pauseModalEl.classList.contains('hidden')) ||
       !this.offlineModalEl.classList.contains('hidden') ||
       !this.skinsModalEl.classList.contains('hidden') ||
       !this.statsModalEl.classList.contains('hidden') ||
@@ -74,6 +83,24 @@ export class ModalController {
     this.bus.on('state:updated', () => this.updateUpgradeButtons());
     this.bus.on('upgrade:purchased', () => this.updateUpgradeButtons());
     this.bus.on('run:lobby', () => this.updateUpgradeButtons());
+
+    this.bus.on('wave:cleared', () => {
+      // Release drag/key state so player gets a breather before next wave
+      this.inputSystem?.reset();
+      this.updateUpgradeButtons();
+    });
+
+    this.bus.on('run:paused', ({ wave, score, coins }) => {
+      this.inputSystem?.reset();
+      if (this.pauseTitleEl) this.pauseTitleEl.textContent = `WAVE ${wave} PAUSED`;
+      if (this.pauseScoreEl) this.pauseScoreEl.textContent = formatNum(score);
+      if (this.pauseCoinsEl) this.pauseCoinsEl.textContent = `${formatNum(coins)} 🪙`;
+      this.pauseModalEl?.classList.remove('hidden');
+    });
+
+    this.bus.on('run:resumed', () => {
+      this.pauseModalEl?.classList.add('hidden');
+    });
 
     this.bus.on('run:gameover', ({ wave, score, runCoins, usedRevive }) => {
       this.inputSystem?.reset();
@@ -129,6 +156,20 @@ export class ModalController {
     this.settingsBtn.addEventListener('click', openSettings);
     this.openDisclaimerBtn?.addEventListener('click', openDisclaimer);
     this.openDisclaimerSettingsBtn?.addEventListener('click', openDisclaimer);
+
+    this.pauseBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.engine.pauseGame();
+    });
+
+    this.resumeBtn?.addEventListener('click', () => {
+      this.engine.resumeGame();
+    });
+
+    this.pauseLobbyBtn?.addEventListener('click', () => {
+      this.pauseModalEl?.classList.add('hidden');
+      this.engine.returnToLobby();
+    });
 
     document.querySelectorAll('[data-close]').forEach((btn) => {
       btn.addEventListener('click', () => {

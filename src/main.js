@@ -34,12 +34,19 @@ function bootstrap() {
 
   const inputSystem = new InputSystem(canvas, engine.cannon, {
     getViewportWidth: () => engine.width,
-    canInteract: () => engine.gameState !== 'GAMEOVER',
+    canInteract: () => engine.gameState !== 'GAMEOVER' && engine.gameState !== 'PAUSED',
     isModalOpen: () => (modalController ? modalController.isAnyModalOpen() : false),
     onActionStart: () => {
       if (engine.gameState === 'LOBBY') {
         audioService.init();
         engine.startRun();
+      }
+    },
+    onTogglePause: () => {
+      if (engine.gameState === 'PLAYING') {
+        engine.pauseGame();
+      } else if (engine.gameState === 'PAUSED') {
+        engine.resumeGame();
       }
     },
   });
@@ -70,7 +77,7 @@ function bootstrap() {
     const dt = Math.min(0.05, (now - lastTime) / 1000);
     lastTime = now;
 
-    engine.update(dt, inputSystem);
+    engine.update(dt, inputSystem, modalController.isAnyModalOpen());
     renderer.render(now);
     requestAnimationFrame(loop);
   }

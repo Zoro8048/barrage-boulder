@@ -199,6 +199,10 @@ html, body {
   transform: scale(0.92);
 }
 
+.icon-btn.hidden {
+  display: none;
+}
+
 /* Boss HUD Bar */
 .boss-hud {
   margin: 8px auto 0;

@@ -1,12 +1,36 @@
 /**
- * HapticsService - Mobile vibration feedback wrapper listening to EventBus events.
+ * HapticsService - Cross-platform mobile haptic feedback.
+ * - Android: Uses standard `navigator.vibrate(pattern)`
+ * - iPhone / iOS 18+ (Safari / WebKit): Uses the native WebKit `<input type="checkbox" switch>`
+ *   Taptic Engine trigger (`label.click()`), since iOS Safari does not implement `navigator.vibrate`.
  */
 
 export class HapticsService {
   constructor(bus, saveManager) {
     this.bus = bus;
     this.saveManager = saveManager;
+    this.lastPulseTime = 0;
+    this.iosSwitchLabel = null;
+
+    this.initIosTapticSwitch();
     this.bindEvents();
+  }
+
+  initIosTapticSwitch() {
+    if (typeof document === 'undefined') return;
+    // Hidden iOS 17.4+ / iOS 18+ native switch input that triggers the iPhone Taptic Engine
+    const label = document.createElement('label');
+    label.setAttribute('aria-hidden', 'true');
+    label.style.cssText =
+      'position:fixed;left:-9999px;top:-9999px;width:1px;height:1px;opacity:0;pointer-events:none;';
+
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.setAttribute('switch', '');
+    label.appendChild(input);
+
+    document.body.appendChild(label);
+    this.iosSwitchLabel = label;
   }
 
   bindEvents() {
@@ -23,14 +47,44 @@ export class HapticsService {
     this.bus.on('run:gameover', () => this.vibrate([60, 50, 90]));
   }
 
+  triggerIosTaptic(pulses = 1) {
+    if (!this.iosSwitchLabel) return;
+    const now = performance.now();
+    // Rate-limit Taptic pulses so rapid rock splits don't saturate the actuator
+    if (now - this.lastPulseTime < 55) return;
+    this.lastPulseTime = now;
+
+    try {
+      this.iosSwitchLabel.click();
+      if (pulses > 1) {
+        setTimeout(() => {
+          try {
+            this.iosSwitchLabel.click();
+          } catch {
+            // ignore
+          }
+        }, 70);
+      }
+    } catch {
+      // ignore
+    }
+  }
+
   vibrate(pattern = 15) {
     if (!this.saveManager.state.settings.haptics) return;
+
+    // 1. Standard Vibration API (Android Chrome / supported browsers)
     if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
       try {
         navigator.vibrate(pattern);
+        return;
       } catch {
-        // Ignore unsupported browser environments
+        // Fallback to iOS Taptic switch below
       }
     }
+
+    // 2. iPhone / iOS 18+ Taptic Engine via WebKit switch input
+    const isMultiPulse = Array.isArray(pattern) && pattern.length > 1;
+    this.triggerIosTaptic(isMultiPulse ? 2 : 1);
   }
 }

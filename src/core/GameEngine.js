@@ -33,6 +33,7 @@ export class GameEngine {
     this.runCoins = 0;
     this.usedRevive = false;
     this.invulnerableTimer = 0;
+    this.intermissionLockTimer = 0;
     this.shakeTimer = 0;
     this.shakeIntensity = 0;
 
@@ -258,12 +259,28 @@ export class GameEngine {
   }
 
   startRun() {
-    if (this.gameState !== 'LOBBY') return;
+    if (this.gameState !== 'LOBBY' || this.intermissionLockTimer > 0) return;
     this.gameState = 'PLAYING';
     this.saveManager.state.stats.runsPlayed += 1;
     this.saveManager.persist();
     this.setupCurrentWave();
     this.bus.emit('run:started');
+  }
+
+  pauseGame() {
+    if (this.gameState !== 'PLAYING') return;
+    this.gameState = 'PAUSED';
+    this.bus.emit('run:paused', {
+      wave: this.saveManager.state.wave,
+      score: this.score,
+      coins: this.saveManager.state.coins,
+    });
+  }
+
+  resumeGame() {
+    if (this.gameState !== 'PAUSED') return;
+    this.gameState = 'PLAYING';
+    this.bus.emit('run:resumed');
   }
 
   onWaveComplete() {
@@ -274,19 +291,39 @@ export class GameEngine {
       (25 + clearedWave * 18) * (isMilestone ? 2.5 : 1) * this.getCoinMultiplier()
     );
 
+    // Auto-collect any remaining coins and power-ups on the field
+    for (const c of this.coins) {
+      this.awardCoins(c.value, c.x, c.y - 10);
+    }
+    this.coins = [];
+
+    for (const p of this.powerups) {
+      this.activatePowerup(p.type, p.x, p.y);
+    }
+    this.powerups = [];
+
+    this.bullets.forEach((b) => this.bulletPool.release(b));
+    this.bullets = [];
+
     save.wave += 1;
     if (save.wave > save.stats.highestWave) {
       save.stats.highestWave = save.wave;
     }
     this.awardCoins(waveBonus);
 
+    // Pause between waves in LOBBY state so the player gets a breather & can buy upgrades
+    this.gameState = 'LOBBY';
+    this.intermissionLockTimer = 0.55;
+
     this.bus.emit('wave:cleared', {
       clearedWave,
+      nextWave: save.wave,
       isMilestone,
       waveBonus,
     });
 
     this.setupCurrentWave();
+    this.bus.emit('run:lobby');
   }
 
   triggerGameOver() {
@@ -344,26 +381,37 @@ export class GameEngine {
   }
 
   // --- Frame Tick ---
-  update(dt, inputSystem) {
+  update(dt, inputSystem, isModalOpen = false) {
     if (this.shakeTimer > 0) {
       this.shakeTimer -= dt;
       if (this.shakeTimer <= 0) this.shakeIntensity = 0;
+    }
+
+    if (this.intermissionLockTimer > 0) {
+      this.intermissionLockTimer = Math.max(0, this.intermissionLockTimer - dt);
+    }
+
+    // Freeze simulation while paused or while a modal dialog is open
+    if (this.gameState === 'PAUSED' || isModalOpen) {
+      return;
     }
 
     if (this.invulnerableTimer > 0) {
       this.invulnerableTimer -= dt;
     }
 
-    // Tick active power-up durations
-    let powerupChanged = false;
-    for (const key of Object.keys(this.activePowerups)) {
-      if (this.activePowerups[key] > 0) {
-        this.activePowerups[key] = Math.max(0, this.activePowerups[key] - dt);
-        powerupChanged = true;
+    // Tick active power-up durations only during active combat
+    if (this.gameState === 'PLAYING') {
+      let powerupChanged = false;
+      for (const key of Object.keys(this.activePowerups)) {
+        if (this.activePowerups[key] > 0) {
+          this.activePowerups[key] = Math.max(0, this.activePowerups[key] - dt);
+          powerupChanged = true;
+        }
       }
-    }
-    if (powerupChanged) {
-      this.bus.emit('powerup:updated', this.activePowerups);
+      if (powerupChanged) {
+        this.bus.emit('powerup:updated', this.activePowerups);
+      }
     }
 
     const keyDir = this.gameState !== 'GAMEOVER' ? inputSystem.getKeyMoveDirection() : 0;

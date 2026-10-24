@@ -28,7 +28,9 @@ export class HudController {
     this.achToastIconEl = document.getElementById('ach-toast-icon');
     this.achToastTitleEl = document.getElementById('ach-toast-title');
     this.startPromptEl = document.getElementById('start-prompt');
+    this.startPromptTextEl = document.getElementById('start-prompt-text');
     this.upgradePanelEl = document.getElementById('upgrade-panel');
+    this.pauseBtn = document.getElementById('pause-btn');
     this.waveBannerEl = document.getElementById('wave-banner');
     this.waveBannerTextEl = document.getElementById('wave-banner-text');
     this.waveBannerBonusEl = document.getElementById('wave-banner-bonus');
@@ -79,10 +81,23 @@ export class HudController {
     this.bus.on('run:started', () => {
       this.startPromptEl.classList.add('hidden');
       this.upgradePanelEl.classList.add('hidden');
+      this.pauseBtn?.classList.remove('hidden');
+    });
+
+    this.bus.on('run:resumed', () => {
+      this.pauseBtn?.classList.remove('hidden');
+    });
+
+    this.bus.on('run:gameover', () => {
+      this.pauseBtn?.classList.add('hidden');
     });
 
     this.bus.on('run:lobby', () => {
       this.updateHUD();
+      this.pauseBtn?.classList.add('hidden');
+      if (this.startPromptTextEl) {
+        this.startPromptTextEl.textContent = `DRAG OR USE ◀ ▶ & SPACE — WAVE ${this.engine.saveManager.state.wave}`;
+      }
       this.startPromptEl.classList.remove('hidden');
       this.upgradePanelEl.classList.remove('hidden');
     });

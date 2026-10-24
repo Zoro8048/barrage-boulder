@@ -33,6 +33,9 @@
           </div>
 
           <div class="hud-actions">
+            <button id="pause-btn" class="icon-btn hidden" title="Pause Game (P / Esc)" aria-label="Pause Game">
+              ⏸️
+            </button>
             <button id="skins-btn" class="icon-btn" title="Skins &amp; Themes" aria-label="Skins and Themes">
               🎨
             </button>
@@ -78,7 +81,7 @@
           <span class="hand-icon">👆</span>
           <span class="arrow">▶</span>
         </div>
-        <p>DRAG OR USE ◀ ▶ &amp; SPACE</p>
+        <p id="start-prompt-text">DRAG OR USE ◀ ▶ &amp; SPACE</p>
       </div>
 
       <!-- Wave Clear / Boss Warning Banner -->
@@ -156,6 +159,32 @@
           </button>
         </div>
       </section>
+
+      <!-- Pause Modal -->
+      <div id="pause-modal" class="modal-backdrop hidden">
+        <div class="modal-card">
+          <div class="modal-badge blue-badge">GAME PAUSED</div>
+          <h2 id="pause-title">WAVE 1</h2>
+          <div class="go-stats">
+            <div class="go-stat-box">
+              <span class="go-label">CURRENT SCORE</span>
+              <span class="go-value" id="pause-score">0</span>
+            </div>
+            <div class="go-stat-box">
+              <span class="go-label">COINS BANKED</span>
+              <span class="go-value gold" id="pause-coins">0 🪙</span>
+            </div>
+          </div>
+          <div class="modal-actions">
+            <button type="button" id="resume-btn" class="action-btn primary">
+              ▶️ RESUME WAVE
+            </button>
+            <button type="button" id="pause-lobby-btn" class="action-btn secondary">
+              🛠️ UPGRADES &amp; LOBBY
+            </button>
+          </div>
+        </div>
+      </div>
 
       <!-- Game Over Modal -->
       <div id="gameover-modal" class="modal-backdrop hidden">

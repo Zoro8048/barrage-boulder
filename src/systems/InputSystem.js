@@ -68,6 +68,11 @@ export class InputSystem {
     this.canvas.addEventListener('pointercancel', endDrag);
 
     window.addEventListener('keydown', (e) => {
+      if (e.code === 'Escape' || e.code === 'KeyP') {
+        e.preventDefault();
+        this.callbacks.onTogglePause?.();
+        return;
+      }
       if (e.code === 'ArrowLeft' || e.code === 'ArrowRight' || e.code === 'Space') {
         e.preventDefault();
       }

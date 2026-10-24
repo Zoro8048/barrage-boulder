@@ -1046,6 +1046,11 @@
       this.canvas.addEventListener('pointercancel', endDrag);
   
       window.addEventListener('keydown', (e) => {
+        if (e.code === 'Escape' || e.code === 'KeyP') {
+          e.preventDefault();
+          this.callbacks.onTogglePause?.();
+          return;
+        }
         if (e.code === 'ArrowLeft' || e.code === 'ArrowRight' || e.code === 'Space') {
           e.preventDefault();
         }
@@ -1557,6 +1562,7 @@
       this.runCoins = 0;
       this.usedRevive = false;
       this.invulnerableTimer = 0;
+      this.intermissionLockTimer = 0;
       this.shakeTimer = 0;
       this.shakeIntensity = 0;
   
@@ -1782,12 +1788,28 @@
     }
   
     startRun() {
-      if (this.gameState !== 'LOBBY') return;
+      if (this.gameState !== 'LOBBY' || this.intermissionLockTimer > 0) return;
       this.gameState = 'PLAYING';
       this.saveManager.state.stats.runsPlayed += 1;
       this.saveManager.persist();
       this.setupCurrentWave();
       this.bus.emit('run:started');
+    }
+  
+    pauseGame() {
+      if (this.gameState !== 'PLAYING') return;
+      this.gameState = 'PAUSED';
+      this.bus.emit('run:paused', {
+        wave: this.saveManager.state.wave,
+        score: this.score,
+        coins: this.saveManager.state.coins,
+      });
+    }
+  
+    resumeGame() {
+      if (this.gameState !== 'PAUSED') return;
+      this.gameState = 'PLAYING';
+      this.bus.emit('run:resumed');
     }
   
     onWaveComplete() {
@@ -1798,19 +1820,39 @@
         (25 + clearedWave * 18) * (isMilestone ? 2.5 : 1) * this.getCoinMultiplier()
       );
   
+      // Auto-collect any remaining coins and power-ups on the field
+      for (const c of this.coins) {
+        this.awardCoins(c.value, c.x, c.y - 10);
+      }
+      this.coins = [];
+  
+      for (const p of this.powerups) {
+        this.activatePowerup(p.type, p.x, p.y);
+      }
+      this.powerups = [];
+  
+      this.bullets.forEach((b) => this.bulletPool.release(b));
+      this.bullets = [];
+  
       save.wave += 1;
       if (save.wave > save.stats.highestWave) {
         save.stats.highestWave = save.wave;
       }
       this.awardCoins(waveBonus);
   
+      // Pause between waves in LOBBY state so the player gets a breather & can buy upgrades
+      this.gameState = 'LOBBY';
+      this.intermissionLockTimer = 0.55;
+  
       this.bus.emit('wave:cleared', {
         clearedWave,
+        nextWave: save.wave,
         isMilestone,
         waveBonus,
       });
   
       this.setupCurrentWave();
+      this.bus.emit('run:lobby');
     }
   
     triggerGameOver() {
@@ -1868,26 +1910,37 @@
     }
   
     // --- Frame Tick ---
-    update(dt, inputSystem) {
+    update(dt, inputSystem, isModalOpen = false) {
       if (this.shakeTimer > 0) {
         this.shakeTimer -= dt;
         if (this.shakeTimer <= 0) this.shakeIntensity = 0;
+      }
+  
+      if (this.intermissionLockTimer > 0) {
+        this.intermissionLockTimer = Math.max(0, this.intermissionLockTimer - dt);
+      }
+  
+      // Freeze simulation while paused or while a modal dialog is open
+      if (this.gameState === 'PAUSED' || isModalOpen) {
+        return;
       }
   
       if (this.invulnerableTimer > 0) {
         this.invulnerableTimer -= dt;
       }
   
-      // Tick active power-up durations
-      let powerupChanged = false;
-      for (const key of Object.keys(this.activePowerups)) {
-        if (this.activePowerups[key] > 0) {
-          this.activePowerups[key] = Math.max(0, this.activePowerups[key] - dt);
-          powerupChanged = true;
+      // Tick active power-up durations only during active combat
+      if (this.gameState === 'PLAYING') {
+        let powerupChanged = false;
+        for (const key of Object.keys(this.activePowerups)) {
+          if (this.activePowerups[key] > 0) {
+            this.activePowerups[key] = Math.max(0, this.activePowerups[key] - dt);
+            powerupChanged = true;
+          }
         }
-      }
-      if (powerupChanged) {
-        this.bus.emit('powerup:updated', this.activePowerups);
+        if (powerupChanged) {
+          this.bus.emit('powerup:updated', this.activePowerups);
+        }
       }
   
       const keyDir = this.gameState !== 'GAMEOVER' ? inputSystem.getKeyMoveDirection() : 0;
@@ -2619,13 +2672,37 @@
 
   // --- Module: src/services/HapticsService.js ---
   /**
-   * HapticsService - Mobile vibration feedback wrapper listening to EventBus events.
+   * HapticsService - Cross-platform mobile haptic feedback.
+   * - Android: Uses standard `navigator.vibrate(pattern)`
+   * - iPhone / iOS 18+ (Safari / WebKit): Uses the native WebKit `<input type="checkbox" switch>`
+   *   Taptic Engine trigger (`label.click()`), since iOS Safari does not implement `navigator.vibrate`.
    */
   class HapticsService {
     constructor(bus, saveManager) {
       this.bus = bus;
       this.saveManager = saveManager;
+      this.lastPulseTime = 0;
+      this.iosSwitchLabel = null;
+  
+      this.initIosTapticSwitch();
       this.bindEvents();
+    }
+  
+    initIosTapticSwitch() {
+      if (typeof document === 'undefined') return;
+      // Hidden iOS 17.4+ / iOS 18+ native switch input that triggers the iPhone Taptic Engine
+      const label = document.createElement('label');
+      label.setAttribute('aria-hidden', 'true');
+      label.style.cssText =
+        'position:fixed;left:-9999px;top:-9999px;width:1px;height:1px;opacity:0;pointer-events:none;';
+  
+      const input = document.createElement('input');
+      input.type = 'checkbox';
+      input.setAttribute('switch', '');
+      label.appendChild(input);
+  
+      document.body.appendChild(label);
+      this.iosSwitchLabel = label;
     }
   
     bindEvents() {
@@ -2642,15 +2719,45 @@
       this.bus.on('run:gameover', () => this.vibrate([60, 50, 90]));
     }
   
+    triggerIosTaptic(pulses = 1) {
+      if (!this.iosSwitchLabel) return;
+      const now = performance.now();
+      // Rate-limit Taptic pulses so rapid rock splits don't saturate the actuator
+      if (now - this.lastPulseTime < 55) return;
+      this.lastPulseTime = now;
+  
+      try {
+        this.iosSwitchLabel.click();
+        if (pulses > 1) {
+          setTimeout(() => {
+            try {
+              this.iosSwitchLabel.click();
+            } catch {
+              // ignore
+            }
+          }, 70);
+        }
+      } catch {
+        // ignore
+      }
+    }
+  
     vibrate(pattern = 15) {
       if (!this.saveManager.state.settings.haptics) return;
+  
+      // 1. Standard Vibration API (Android Chrome / supported browsers)
       if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
         try {
           navigator.vibrate(pattern);
+          return;
         } catch {
-          // Ignore unsupported browser environments
+          // Fallback to iOS Taptic switch below
         }
       }
+  
+      // 2. iPhone / iOS 18+ Taptic Engine via WebKit switch input
+      const isMultiPulse = Array.isArray(pattern) && pattern.length > 1;
+      this.triggerIosTaptic(isMultiPulse ? 2 : 1);
     }
   }
 
@@ -2681,7 +2788,9 @@
       this.achToastIconEl = document.getElementById('ach-toast-icon');
       this.achToastTitleEl = document.getElementById('ach-toast-title');
       this.startPromptEl = document.getElementById('start-prompt');
+      this.startPromptTextEl = document.getElementById('start-prompt-text');
       this.upgradePanelEl = document.getElementById('upgrade-panel');
+      this.pauseBtn = document.getElementById('pause-btn');
       this.waveBannerEl = document.getElementById('wave-banner');
       this.waveBannerTextEl = document.getElementById('wave-banner-text');
       this.waveBannerBonusEl = document.getElementById('wave-banner-bonus');
@@ -2732,10 +2841,23 @@
       this.bus.on('run:started', () => {
         this.startPromptEl.classList.add('hidden');
         this.upgradePanelEl.classList.add('hidden');
+        this.pauseBtn?.classList.remove('hidden');
+      });
+  
+      this.bus.on('run:resumed', () => {
+        this.pauseBtn?.classList.remove('hidden');
+      });
+  
+      this.bus.on('run:gameover', () => {
+        this.pauseBtn?.classList.add('hidden');
       });
   
       this.bus.on('run:lobby', () => {
         this.updateHUD();
+        this.pauseBtn?.classList.add('hidden');
+        if (this.startPromptTextEl) {
+          this.startPromptTextEl.textContent = `DRAG OR USE ◀ ▶ & SPACE — WAVE ${this.engine.saveManager.state.wave}`;
+        }
         this.startPromptEl.classList.remove('hidden');
         this.upgradePanelEl.classList.remove('hidden');
       });
@@ -2831,6 +2953,14 @@
       this.reviveBtn = document.getElementById('revive-btn');
       this.continueBtn = document.getElementById('continue-btn');
   
+      this.pauseModalEl = document.getElementById('pause-modal');
+      this.pauseTitleEl = document.getElementById('pause-title');
+      this.pauseScoreEl = document.getElementById('pause-score');
+      this.pauseCoinsEl = document.getElementById('pause-coins');
+      this.pauseBtn = document.getElementById('pause-btn');
+      this.resumeBtn = document.getElementById('resume-btn');
+      this.pauseLobbyBtn = document.getElementById('pause-lobby-btn');
+  
       this.offlineModalEl = document.getElementById('offline-modal');
       this.offlineAmountEl = document.getElementById('offline-amount');
       this.claimOfflineBtn = document.getElementById('claim-offline-btn');
@@ -2861,6 +2991,7 @@
     isAnyModalOpen() {
       return (
         !this.gameoverModalEl.classList.contains('hidden') ||
+        (this.pauseModalEl && !this.pauseModalEl.classList.contains('hidden')) ||
         !this.offlineModalEl.classList.contains('hidden') ||
         !this.skinsModalEl.classList.contains('hidden') ||
         !this.statsModalEl.classList.contains('hidden') ||
@@ -2874,6 +3005,24 @@
       this.bus.on('state:updated', () => this.updateUpgradeButtons());
       this.bus.on('upgrade:purchased', () => this.updateUpgradeButtons());
       this.bus.on('run:lobby', () => this.updateUpgradeButtons());
+  
+      this.bus.on('wave:cleared', () => {
+        // Release drag/key state so player gets a breather before next wave
+        this.inputSystem?.reset();
+        this.updateUpgradeButtons();
+      });
+  
+      this.bus.on('run:paused', ({ wave, score, coins }) => {
+        this.inputSystem?.reset();
+        if (this.pauseTitleEl) this.pauseTitleEl.textContent = `WAVE ${wave} PAUSED`;
+        if (this.pauseScoreEl) this.pauseScoreEl.textContent = formatNum(score);
+        if (this.pauseCoinsEl) this.pauseCoinsEl.textContent = `${formatNum(coins)} 🪙`;
+        this.pauseModalEl?.classList.remove('hidden');
+      });
+  
+      this.bus.on('run:resumed', () => {
+        this.pauseModalEl?.classList.add('hidden');
+      });
   
       this.bus.on('run:gameover', ({ wave, score, runCoins, usedRevive }) => {
         this.inputSystem?.reset();
@@ -2929,6 +3078,20 @@
       this.settingsBtn.addEventListener('click', openSettings);
       this.openDisclaimerBtn?.addEventListener('click', openDisclaimer);
       this.openDisclaimerSettingsBtn?.addEventListener('click', openDisclaimer);
+  
+      this.pauseBtn?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.engine.pauseGame();
+      });
+  
+      this.resumeBtn?.addEventListener('click', () => {
+        this.engine.resumeGame();
+      });
+  
+      this.pauseLobbyBtn?.addEventListener('click', () => {
+        this.pauseModalEl?.classList.add('hidden');
+        this.engine.returnToLobby();
+      });
   
       document.querySelectorAll('[data-close]').forEach((btn) => {
         btn.addEventListener('click', () => {
@@ -3182,12 +3345,19 @@
   
     const inputSystem = new InputSystem(canvas, engine.cannon, {
       getViewportWidth: () => engine.width,
-      canInteract: () => engine.gameState !== 'GAMEOVER',
+      canInteract: () => engine.gameState !== 'GAMEOVER' && engine.gameState !== 'PAUSED',
       isModalOpen: () => (modalController ? modalController.isAnyModalOpen() : false),
       onActionStart: () => {
         if (engine.gameState === 'LOBBY') {
           audioService.init();
           engine.startRun();
+        }
+      },
+      onTogglePause: () => {
+        if (engine.gameState === 'PLAYING') {
+          engine.pauseGame();
+        } else if (engine.gameState === 'PAUSED') {
+          engine.resumeGame();
         }
       },
     });
@@ -3218,7 +3388,7 @@
       const dt = Math.min(0.05, (now - lastTime) / 1000);
       lastTime = now;
   
-      engine.update(dt, inputSystem);
+      engine.update(dt, inputSystem, modalController.isAnyModalOpen());
       renderer.render(now);
       requestAnimationFrame(loop);
     }
