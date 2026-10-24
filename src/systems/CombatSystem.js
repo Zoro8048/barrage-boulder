@@ -39,7 +39,48 @@ export class CombatSystem {
     const pierceLeft = (isPierce ? 3 : 0) + (variety.pierceCount || 0);
     const splashRadius = isExplosive ? 95 : variety.splashRadius || 0;
     const dmgRatio = (variety.damageMult || 1) * (isGiant ? 2.0 : 1.0);
-    const bulletRadius = isGiant ? 10 : variety.id === 'railgun' ? 7 : isOverdrive ? 6.2 : 5.5;
+    const bulletRadius = isGiant ? 11.5 : variety.id === 'railgun' ? 7 : isOverdrive ? 6 : 5.5;
+
+    // Determine distinct projectile shape so every power-up looks and feels unique
+    const bulletShape = isGiant
+      ? 'saw'
+      : isExplosive
+      ? 'bomb'
+      : isSpreadPowerup
+      ? 'star'
+      : isOverdrive
+      ? 'needle'
+      : 'standard';
+
+    // Pierce Beam Power-Up: Instant full-column neon magenta Laser Lance!
+    if (isPierce) {
+      const baseDmg = Math.max(1, Math.round(engine.getBulletDamage() * dmgRatio * 0.9));
+      for (let i = 0; i < barrels; i++) {
+        const offsetX = -totalSpan / 2 + i * spacing;
+        const beamX = cannon.x + offsetX;
+        engine.laserBeams.push({
+          x: beamX,
+          y: cannon.y - 48,
+          width: isGiant ? 18 : 11,
+          color: '#d980fa',
+          life: 1.0,
+        });
+
+        // Hit every boulder intersecting the laser column
+        for (let j = engine.rocks.length - 1; j >= 0; j--) {
+          const r = engine.rocks[j];
+          if (!r) continue;
+          if (Math.abs(r.x - beamX) <= r.radius + 14) {
+            engine.addParticles(beamX, r.y + r.radius * 0.4, '#d980fa', 4, 130);
+            this.applyDamageToRock(r, baseDmg, engine, { isCrit: false, isLaser: true });
+          }
+        }
+      }
+      cannon.recoil = 4;
+      cannon.muzzleFlash = 1;
+      this.bus.emit('sfx:shoot', { overdrive: true });
+      return;
+    }
 
     for (let i = 0; i < barrels; i++) {
       const offsetX = -totalSpan / 2 + i * spacing;
@@ -55,11 +96,15 @@ export class CombatSystem {
           vx,
           vy,
           radius: bulletRadius,
+          shape: bulletShape,
+          spinAngle: 0,
+          bouncesLeft: isSpreadPowerup ? 2 : 0,
           overdrive: isOverdrive,
           isGiant,
           isPierce: pierceLeft > 0,
           pierceLeft,
           splashRadius,
+          spawnClusters: isExplosive,
           lastHitRock: null,
           isDrone: false,
           damageRatio: dmgRatio,
@@ -67,24 +112,28 @@ export class CombatSystem {
       );
     }
 
-    // Spread Fan Power-Up adds 2 angled wing shots
+    // Ricochet Fan Power-Up adds 2 wide-angle wall-bouncing Star Blades
     if (isSpreadPowerup) {
-      for (const sideAngle of [-0.26, 0.26]) {
+      for (const sideAngle of [-0.34, 0.34]) {
         bullets.push(
           bulletPool.acquire({
             x: cannon.x,
             y: cannon.y - 46,
             vx: Math.sin(sideAngle) * Math.abs(speed),
             vy: -Math.cos(sideAngle) * Math.abs(speed),
-            radius: bulletRadius * 0.9,
+            radius: 8,
+            shape: 'star',
+            spinAngle: Math.random() * Math.PI,
+            bouncesLeft: 2,
             overdrive: isOverdrive,
             isGiant,
             isPierce: pierceLeft > 0,
             pierceLeft,
             splashRadius,
+            spawnClusters: isExplosive,
             lastHitRock: null,
             isDrone: false,
-            damageRatio: dmgRatio * 0.85,
+            damageRatio: dmgRatio * 0.9,
           })
         );
       }
@@ -164,9 +213,12 @@ export class CombatSystem {
       return 0;
     }
 
+    const isFrozen = engine.activePowerups.freeze > 0 || r.chillTimer > 0;
+    const frostMult = isFrozen ? 1.25 : 1.0;
     const hasIntactArmor = r.variant === 'armored' && !r.armorBroken;
     const armorScale = ROCK_VARIANTS.armored.armorDamageScale;
-    const afterArmor = hasIntactArmor ? Math.max(1, Math.round(rawDmg * armorScale)) : rawDmg;
+    const boostedDmg = Math.max(1, Math.round(rawDmg * frostMult));
+    const afterArmor = hasIntactArmor ? Math.max(1, Math.round(boostedDmg * armorScale)) : boostedDmg;
     const actualDmg = Math.min(r.hp, afterArmor);
 
     r.hp -= actualDmg;
@@ -181,8 +233,6 @@ export class CombatSystem {
     if (engine.score > save.bestScore) {
       save.bestScore = engine.score;
     }
-
-    engine.addUltimateCharge(COMBAT.ULTIMATE_CHARGE_PER_HIT);
 
     if (isCrit) {
       engine.addFloatingText(r.x, r.y - 12, `💥 ${formatNum(actualDmg)}!`, '#ff4757', 14);
@@ -221,56 +271,9 @@ export class CombatSystem {
     return actualDmg;
   }
 
-  triggerUltimate(engine) {
-    if (engine.gameState !== 'PLAYING' || engine.ultimateCharge < 100) return false;
-
-    engine.ultimateCharge = 0;
-    engine.ultimateBeamTimer = COMBAT.ULTIMATE_BEAM_DURATION;
-    engine.invulnerableTimer = Math.max(engine.invulnerableTimer, 2.0);
-    engine.triggerShake(15, 0.4);
-    engine.addShockwave(engine.cannon.x, engine.cannon.y - 40, 420, 'rgba(72, 219, 251, 0.9)');
-    engine.addFloatingText(
-      engine.width / 2,
-      engine.height * 0.36,
-      '☄️ ORBITAL SUPERNOVA!',
-      '#48dbfb',
-      20
-    );
-
-    const ultDamage = Math.max(15, Math.round(engine.getBulletDamage() * 14));
-    const save = engine.saveManager.state;
-
-    for (let j = engine.rocks.length - 1; j >= 0; j--) {
-      const r = engine.rocks[j];
-      r.armorBroken = true;
-      r.bossShieldTimer = 0;
-      const actualDmg = Math.min(r.hp, ultDamage);
-      r.hp -= actualDmg;
-      engine.score += actualDmg;
-      engine.waveSystem.waveDamageDealt += actualDmg;
-      if (engine.score > save.bestScore) {
-        save.bestScore = engine.score;
-      }
-
-      r.vy = -480;
-      r.hitScale = 1.3;
-      r.hitFlash = 0.6;
-      engine.addParticles(r.x, r.y, '#48dbfb', 10, 220);
-
-      if (r.hp <= 0) {
-        this.destroyRock(r, j, engine, true);
-      }
-    }
-
-    this.bus.emit('sfx:ultimate');
-    this.bus.emit('ultimate:updated', engine.ultimateCharge);
-    this.bus.emit('hud:scoreUpdated');
-    this.bus.emit('wave:updated', {
-      waveNum: save.wave,
-      damageDealt: engine.waveSystem.waveDamageDealt,
-      totalHP: engine.waveSystem.waveTotalHP,
-    });
-    return true;
+  triggerUltimate() {
+    // Removed repetitive upward-push wave so boulder physics stay natural
+    return false;
   }
 
   updateBullets(dt, engine) {
@@ -289,8 +292,26 @@ export class CombatSystem {
       const b = bullets[i];
       b.x += b.vx * dt;
       b.y += b.vy * dt;
+      if (b.shape === 'saw' || b.shape === 'star') {
+        b.spinAngle = (b.spinAngle || 0) + dt * 16;
+      }
 
-      if (b.y < -30 || b.y > engine.height + 20 || b.x < -20 || b.x > width + 20) {
+      // Ricochet Fan Star Blades bounce off left and right arena walls!
+      if (b.bouncesLeft > 0) {
+        if (b.x - b.radius < 0 && b.vx < 0) {
+          b.x = b.radius;
+          b.vx = Math.abs(b.vx);
+          b.bouncesLeft -= 1;
+          engine.addParticles(b.x, b.y, '#ff9f1a', 5, 110);
+        } else if (b.x + b.radius > width && b.vx > 0) {
+          b.x = width - b.radius;
+          b.vx = -Math.abs(b.vx);
+          b.bouncesLeft -= 1;
+          engine.addParticles(b.x, b.y, '#ff9f1a', 5, 110);
+        }
+      }
+
+      if (b.y < -30 || b.y > engine.height + 20 || b.x < -25 || b.x > width + 25) {
         bullets.splice(i, 1);
         bulletPool.release(b);
         continue;
@@ -305,27 +326,43 @@ export class CombatSystem {
         if (distSq <= (r.radius + b.radius) ** 2) {
           b.lastHitRock = r;
 
+          // Saw Calibre blades instantly shred Armored boulder shields on contact!
+          if (b.shape === 'saw' && r.variant === 'armored' && !r.armorBroken) {
+            r.armorBroken = true;
+            engine.addParticles(r.x, r.y, '#ffa502', 14, 210);
+            engine.addFloatingText(r.x, r.y - r.radius, '🔥 SAW SHREDDED!', '#ffa502', 13);
+          }
+
           const isCrit = !b.isDrone && Math.random() < critChance;
           const mult = isCrit ? critMult : 1.0;
           const scaledDmg = Math.max(1, Math.round(baseBulletDmg * (b.damageRatio || 1) * mult));
 
           const hasIntactArmor = r.variant === 'armored' && !r.armorBroken;
-          if (r.vy > -120) r.vy -= b.isGiant ? 28 : 12;
+          if (r.vy > -110) r.vy -= b.isGiant ? 20 : 10;
 
           this.bus.emit('sfx:hit', { hpRatio: r.hp / r.maxHp, armored: hasIntactArmor });
           engine.addParticles(
             b.x,
             b.y,
-            isCrit ? '#ff4757' : hasIntactArmor ? '#dfe4ea' : '#fffa65',
+            b.shape === 'saw'
+              ? '#ffa502'
+              : b.shape === 'star'
+              ? '#ff9f1a'
+              : isCrit
+              ? '#ff4757'
+              : hasIntactArmor
+              ? '#dfe4ea'
+              : '#fffa65',
             isCrit ? 6 : 3,
             110
           );
 
           this.applyDamageToRock(r, scaledDmg, engine, { isCrit });
 
-          // Area Splash Damage (Explosive Rounds Power-Up or Siege Blast Cannon)
+          // Area Splash Damage + Cluster Shrapnel (Blast Shells Power-Up or Siege Blast Cannon)
           if (b.splashRadius > 0) {
-            engine.addShockwave(b.x, b.y, b.splashRadius, 'rgba(255, 118, 117, 0.75)');
+            engine.addShockwave(b.x, b.y, b.splashRadius, 'rgba(255, 71, 87, 0.85)');
+            engine.addParticles(b.x, b.y, '#ff4757', 10, 190);
             const splashDmg = Math.max(1, Math.round(scaledDmg * 0.5));
             for (let k = rocks.length - 1; k >= 0; k--) {
               const other = rocks[k];
@@ -333,6 +370,33 @@ export class CombatSystem {
               const d = Math.hypot(other.x - b.x, other.y - b.y);
               if (d <= b.splashRadius + other.radius) {
                 this.applyDamageToRock(other, splashDmg, engine, { isCrit: false });
+              }
+            }
+
+            // Spawn 3 Cluster Shrapnel bolts if triggered by Blast Shells power-up
+            if (b.spawnClusters) {
+              for (const cAngle of [-0.55, 0, 0.55]) {
+                bullets.push(
+                  bulletPool.acquire({
+                    x: b.x,
+                    y: b.y - 6,
+                    vx: Math.sin(cAngle) * 520,
+                    vy: -Math.cos(cAngle) * 520,
+                    radius: 4.5,
+                    shape: 'shrapnel',
+                    spinAngle: 0,
+                    bouncesLeft: 0,
+                    overdrive: false,
+                    isGiant: false,
+                    isPierce: false,
+                    pierceLeft: 0,
+                    splashRadius: 0,
+                    spawnClusters: false,
+                    lastHitRock: r,
+                    isDrone: false,
+                    damageRatio: 0.45,
+                  })
+                );
               }
             }
           }

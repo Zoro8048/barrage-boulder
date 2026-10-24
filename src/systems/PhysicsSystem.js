@@ -27,6 +27,20 @@ export class PhysicsSystem {
     const addon = saveManager.getActiveAddon();
     const globalScale = activePowerups.freeze > 0 ? PHYSICS.CRYO_TIME_SCALE : 1;
 
+    // Cryo Blizzard ambient falling snow particles
+    if (activePowerups.freeze > 0 && Math.random() < 0.3) {
+      engine.spawnParticle({
+        x: Math.random() * width,
+        y: 60 + Math.random() * 80,
+        vx: (Math.random() - 0.5) * 40,
+        vy: 50 + Math.random() * 40,
+        r: 2 + Math.random() * 2,
+        color: '#7ed6df',
+        life: 0.85,
+        decay: 1.1,
+      });
+    }
+
     for (let i = rocks.length - 1; i >= 0; i--) {
       const r = rocks[i];
       if (r.chillTimer > 0) r.chillTimer = Math.max(0, r.chillTimer - dt);
@@ -105,7 +119,13 @@ export class PhysicsSystem {
             r.y = Math.min(r.y, cannonCenterY - hitDist - 4);
             this.bus.emit('sfx:hit', { hpRatio: 0.2, armored: true });
             engine.triggerShake(6, 0.14);
-            engine.addParticles(r.x, r.y + r.radius * 0.5, '#2ed573', 10, 180);
+            engine.addShockwave(cannon.x, cannonCenterY, 75, 'rgba(46, 213, 115, 0.85)');
+            engine.addParticles(r.x, r.y + r.radius * 0.5, '#2ed573', 12, 190);
+            if (activePowerups.shield > 0) {
+              const zapDmg = Math.max(2, Math.round(engine.getBulletDamage() * 3.2));
+              engine.addFloatingText(r.x, r.y - 14, `🛡️ DOME ZAP!`, '#2ed573', 13);
+              combatSystem.applyDamageToRock(r, zapDmg, engine, { isCrit: true });
+            }
           } else if (addon.id === 'sawBlade' && cannon.sawCooldown <= 0) {
             // Bumper Buzzsaw slices rock and bounces it skyward!
             cannon.sawCooldown = 2.5;
@@ -118,7 +138,7 @@ export class PhysicsSystem {
             const sawDmg = Math.max(2, Math.round(engine.getBulletDamage() * 4.5));
             combatSystem.applyDamageToRock(r, sawDmg, engine, { isCrit: true });
           } else {
-            engine.triggerGameOver();
+            engine.triggerGameOver(r);
             break;
           }
         }
@@ -214,7 +234,14 @@ export class PhysicsSystem {
   }
 
   updateVFX(dt, engine) {
-    const { shockwaves, particles, floatingTexts, particlePool, textPool } = engine;
+    const { shockwaves, laserBeams, particles, floatingTexts, particlePool, textPool } = engine;
+
+    if (laserBeams) {
+      for (let i = laserBeams.length - 1; i >= 0; i--) {
+        laserBeams[i].life -= dt * 6.5;
+        if (laserBeams[i].life <= 0) laserBeams.splice(i, 1);
+      }
+    }
 
     for (let i = shockwaves.length - 1; i >= 0; i--) {
       const sw = shockwaves[i];

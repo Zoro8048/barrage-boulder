@@ -79,6 +79,8 @@ export class WaveSystem {
           isBoss: true,
           isMilestone,
           variant,
+          fromLeft: rng() < 0.5,
+          spawnYRatio: rng(),
         });
       }
     } else {
@@ -115,6 +117,8 @@ export class WaveSystem {
           isBoss,
           isMilestone: variant === 'milestoneBoss',
           variant,
+          fromLeft: rng() < 0.5,
+          spawnYRatio: rng(),
         });
       }
     }
@@ -154,13 +158,32 @@ export class WaveSystem {
     }
   }
 
+  getPendingWarning(activeRocks, waveNum) {
+    if (this.waveRocksToSpawn.length === 0 || this.spawnTimer > 0.65) return null;
+    const activeWeight = activeRocks.reduce(
+      (sum, r) => sum + (r.size === 3 ? 2.0 : r.size === 2 ? 1.35 : 0.85),
+      0
+    );
+    const maxWeight = 4.2 + Math.min(2.5, Math.floor(waveNum / 6) * 0.5);
+    if (activeRocks.length > 0 && activeWeight >= maxWeight) return null;
+    const next = this.waveRocksToSpawn[0];
+    return {
+      fromLeft: next.fromLeft ?? true,
+      y: 95 + (next.spawnYRatio ?? 0.5) * 80,
+      isBoss: next.isBoss,
+      variant: next.variant,
+      size: next.size,
+      urgency: 1 - Math.max(0, this.spawnTimer) / 0.65,
+    };
+  }
+
   spawnNextRock(activeRocks, width) {
     if (this.waveRocksToSpawn.length === 0) return null;
     const spec = this.waveRocksToSpawn.shift();
-    const fromLeft = Math.random() < 0.5;
+    const fromLeft = spec.fromLeft !== undefined ? spec.fromLeft : Math.random() < 0.5;
     const radius = ROCK_RADII[spec.size] || 38;
     const x = fromLeft ? -radius * 0.5 : width + radius * 0.5;
-    const y = 90 + Math.random() * 85;
+    const y = 95 + (spec.spawnYRatio !== undefined ? spec.spawnYRatio : Math.random()) * 80;
     const baseSpeed = spec.variant === 'fast' ? 140 + Math.random() * 65 : 75 + Math.random() * 55;
     const speedX = (fromLeft ? 1 : -1) * baseSpeed;
 

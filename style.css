@@ -175,6 +175,7 @@ html, body {
 }
 
 .icon-btn {
+  position: relative;
   pointer-events: auto;
   width: 34px;
   height: 34px;
@@ -188,6 +189,22 @@ html, body {
   align-items: center;
   justify-content: center;
   transition: transform 0.1s ease, background 0.15s ease, border-color 0.15s ease;
+}
+
+.notif-dot {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--accent-red);
+  border: 2px solid #0f162c;
+  box-shadow: 0 0 8px var(--accent-red);
+}
+
+.notif-dot.hidden {
+  display: none;
 }
 
 .icon-btn:hover {
@@ -321,6 +338,10 @@ html, body {
 .lobby-mode-wrap {
   margin-top: 6px;
   pointer-events: auto;
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 5px;
 }
 
 .lobby-mode-wrap.hidden {
@@ -328,15 +349,20 @@ html, body {
 }
 
 .mode-chip-btn {
-  background: rgba(15, 23, 48, 0.82);
+  background: rgba(15, 23, 48, 0.84);
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 999px;
   color: #d2e2ff;
-  font-size: 10.5px;
+  font-size: 10px;
   font-weight: 800;
-  padding: 4px 12px;
+  padding: 4px 10px;
   cursor: pointer;
   transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.loadout-chip-btn {
+  border-color: rgba(56, 182, 255, 0.4);
+  color: #ffffff;
 }
 
 .mode-chip-btn:hover {
@@ -406,6 +432,41 @@ html, body {
 #start-prompt.hidden {
   opacity: 0;
   transform: translate(-50%, -40%) scale(0.9);
+}
+
+.wave-stepper-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  pointer-events: auto;
+}
+
+.wave-step-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(56, 182, 255, 0.55);
+  background: rgba(12, 18, 38, 0.88);
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 900;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease, transform 0.08s ease;
+}
+
+.wave-step-btn:hover {
+  background: rgba(56, 182, 255, 0.35);
+}
+
+.wave-step-btn:active {
+  transform: scale(0.9);
+}
+
+.wave-step-btn.hidden {
+  display: none;
 }
 
 .start-wave-pill {

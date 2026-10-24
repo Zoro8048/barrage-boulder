@@ -18,20 +18,25 @@ A free, non-commercial, browser-based arcade boulder-defense game built from scr
 
 ## Quick Start (Local Development)
 
-Because the project uses native browser ES Modules (`<script type="module" src="./src/main.js">`), serve the directory over a local HTTP server rather than opening `file://` directly:
+The modular source code under `src/` is bundled into `game.js` via a zero-dependency bundler (`scripts/bundle.js`) so it works both by opening `index.html` directly or over a local HTTP server:
 
 ```bash
+# Bundle src/ -> game.js and run unit tests
+npm test
+
+# Start local HTTP server on port 8080
 npm start
-# or directly with Python:
-python3 -m http.server 8080
 ```
 
 Then open `http://localhost:8080` in any modern desktop or mobile browser.
 
 ### Controls
 
-- **Mouse / Touch**: Click/touch and drag horizontally to move the cannon and auto-fire. Tap the **☄️ READY!** button (bottom-right) when charged to unleash your **Orbital Supernova** ultimate.
-- **Keyboard**: Use `◀` / `▶` (`ArrowLeft` / `ArrowRight`) to move, hold `Space` to fire, press `E` or `Shift` to trigger **Orbital Supernova**, and press `P` or `Esc` to pause.
+- **Mouse / Touch**: Click/touch and drag horizontally anywhere—or use the **Underground Thumb Trackpad (`◀ DRAG THUMB HERE ▶`)** below the grass line on mobile so your thumb never blocks your cannon—to move and auto-fire.
+- **Keyboard**: Use `◀` / `▶` (`ArrowLeft` / `ArrowRight`) to move, hold `Space` to fire, and press `P` or `Esc` to pause.
+- **Lobby Controls**:
+  - Use the **`◀` / `▶` Wave Stepper** on the Wave Pill to replay earlier waves for coin farming or jump back to your highest unlocked wave.
+  - **Press and hold** any of the 4 Upgrade Cards to rapidly auto-buy upgrades while affordable.
 
 ---
 
@@ -81,8 +86,11 @@ flowchart TD
 
 ```text
 boulder-barrage/
-├── index.html                  # Game shell, HUD overlay, upgrade cards, and modals
+├── index.html                  # Game shell, HUD overlay, upgrade cards, and 5-tab Hangar/Codex
 ├── style.css                   # Responsive 9:16 viewport styling, HUD pills, and animations
+├── game.js                     # Bundled runtime generated from src/ via `npm run build`
+├── scripts/
+│   └── bundle.js               # Zero-dependency ES module -> IIFE bundler
 ├── manifest.webmanifest        # Mobile PWA / Add-to-Home-Screen manifest
 ├── .nojekyll                   # Bypass Jekyll on GitHub Pages for instant static serving
 ├── .github/workflows/
@@ -92,9 +100,11 @@ boulder-barrage/
 │   ├── config/                 # Declarative data registries & balance constants
 │   │   ├── constants.js        # Physics, gravity, bounce velocities, and save keys
 │   │   ├── upgrades.js         # Upgrade tracks and cost/stat scaling parameters
-│   │   ├── skins.js            # Unlockable cannon skins catalog
-│   │   ├── themes.js           # Unlockable visual arena themes catalog
-│   │   ├── powerups.js         # Power-up metadata, colors, and durations
+│   │   ├── cannons.js          # 5 Unlockable Cannon Varieties (Chassis classes)
+│   │   ├── addons.js           # 5 Unlockable Tactical Add-Ons
+│   │   ├── skins.js            # 8 Unlockable Cannon Skins catalog
+│   │   ├── themes.js           # 7 Unlockable Visual Arena Themes catalog
+│   │   ├── powerups.js         # 8 Distinct Power-Ups with orb tags & HUD descriptions
 │   │   ├── rockVariants.js     # Declarative rock & boss variant rules + HP color tiers
 │   │   └── achievements.js     # Lifetime achievements catalog & progress evaluators
 │   ├── core/                   # Engine primitives
@@ -235,45 +245,48 @@ Because the project uses native ES modules with relative paths (`./src/main.js`)
   - [x] Pub/Sub `EventBus` and `ObjectPool` for zero-GC-spike performance
   - [x] GitHub Pages CI workflow (`.github/workflows/deploy.yml`) & Mobile Web App (`manifest.webmanifest`, `.nojekyll`)
   - [x] Automated unit test suite (`node --test`)
-- [x] **Core Cannon, Wingman Drones & Ultimate Skill**
+- [x] **Core Cannon, Tactical Add-Ons & Combat Systems**
   - [x] Smooth horizontal cannon movement with rotating wheels, recoil, and muzzle flash
-  - [x] Gravity, wall bouncing, and size-based floor bounce arcs for rocks
+  - [x] Underground **Thumb Trackpad Zone (`◀ DRAG THUMB HERE ▶`)** during active gameplay so mobile players never cover their cannon with their thumb
+  - [x] Per-boulder randomized bounce heights and desynchronized split arcs so waves never bounce in lockstep
   - [x] Multi-barrel volley firing (unlocks 2, 3, and 4 barrels at higher Fire Rate levels)
-  - [x] **Wingman Helper Drones** (auto-unlock at Wave 5 / Fire Power Lv. 5 and Wave 12 / Fire Power Lv. 10) firing homing plasma spheres at the nearest boulder
-  - [x] **Orbital Supernova Ultimate (`☄️`)** rechargeable ability (`E` / `Shift` / on-screen button) that blasts all boulders on screen, shatters armor, and grants temporary invulnerability
   - [x] **Combo Streak Multiplier & Critical Hits (`💥 CRIT!`)** up to 2.5x score multiplier
   - [x] **Boss Rush Mode (`👑 2x 🪙`)** unlocked at Wave 6 for back-to-back Boss & Titan waves
+  - [x] **Lobby Wave Stepper (`◀ WAVE X ▶`)** to replay/farm any cleared wave and jump back to `highestWave`
+  - [x] **Spawn-Edge Warning Indicators** (`0.65s` before a boulder enters) & **0.38s Slow-Motion Fatal Hit** impact feedback
   - [x] In-game **Pause Modal (`⏸️`)** and automatic between-wave upgrade breather
 - [x] **Rocks, Special Variants & Wave Progression**
-  - [x] Faceted polygon boulders with dynamic HP color tiers
+  - [x] Faceted polygon boulders with dynamic HP color tiers and smooth piecewise Wave 25+ HP & coin scaling
   - [x] Rock splitting mechanics (Large → 2 Medium → 4 Small)
   - [x] Additional enemy/rock types: **Armored Rocks** (🛡️ 40% damage reduction above 50% HP), **Fast Meteor Rocks** (☄️ high horizontal speed, low bounce), and **Healer Crystal Rocks** (💚 periodic healing pulse to nearby rocks)
   - [x] Boss rocks every 3 waves with gravity surge ability + dedicated Boss HP bar
   - [x] **Milestone Mega-Boss Waves** every 10 waves with **Titan Aegis Shield** and **Meteor Swarm** summons
   - [x] Real-time wave progress bar tracking total wave HP
   - [x] Wave clear banner and bonus coin rewards
-- [x] **Power-Up Drops (8 Types)**
-  - [x] **Overdrive** (⚡ 1.85x Fire Rate & high-velocity plasma bullets)
-  - [x] **Spread Fan** (🔱 Adds angled outer wing streams to blanket the sky)
-  - [x] **Blast Shells** (💣 Explosive rounds that deal 50% area splash damage on impact)
-  - [x] **Pierce Beam** (🔦 High-energy laser rounds that slice straight through multiple boulders)
-  - [x] **Mega Calibre** (🔥 Oversized 2x damage shells with heavy upward knockback)
-  - [x] **Force Shield** (🛡️ Protective energy bubble that repels boulders upward on contact)
-  - [x] **Coin Magnet** (🧲 Full-screen magnetic pull + 1.5x coin value bonus)
-  - [x] **Cryo Slow** (❄️ Slows boulder gravity & movement by 55%)
+- [x] **8 Visually & Mechanically Distinct Power-Ups (With On-Canvas Tags & Codex)**
+  - [x] **Overdrive (`2x SPEED`)**: ⚡ 1.85x Fire Rate firing twin electric cyan hyper-tracer needles
+  - [x] **Ricochet Fan (`BOUNCE`)**: 🔱 Spinning 4-point star blades that ricochet off the left and right arena walls
+  - [x] **Blast Shells (`CLUSTER`)**: 💣 Heavy mortar bombs that detonate into a fiery blast ring + 3 cluster shrapnel sparks
+  - [x] **Pierce Beam (`LASER`)**: 🔦 Instant full-column neon magenta laser lances slicing straight from barrel to ceiling
+  - [x] **Saw Calibre (`SAW 2X`)**: 🔥 Rotating fiery serrated sawblades (`2x DMG`) that instantly shred `🛡️ Armored` shells on contact
+  - [x] **Plasma Dome (`SHIELD`)**: 🛡️ Emerald energy dome that zaps touching boulders for `3.2x DMG` while repelling them upward
+  - [x] **Magnet Vortex (`2x COINS`)**: 🧲 Rotating golden gravity ring around the cannon with full-screen pull + 1.5x coin value
+  - [x] **Cryo Blizzard (`FROST`)**: ❄️ Drifting snow crystals, 55% boulder slow, and +25% brittle shatter damage
 - [x] **Economy, Upgrades & Persistence**
-  - [x] Physical coin drops with floor bounce and magnetic pull toward the cannon
-  - [x] 4 upgrade tracks: **Fire Rate**, **Fire Power**, **Coins Multiplier**, and **Offline Earnings**
-  - [x] `localStorage` auto-save with schema migration and progress reset option
+  - [x] Physical coin drops with floor bounce, wave-scaled coin values, and magnetic pull toward the cannon
+  - [x] 4 upgrade tracks (**Fire Rate**, **Fire Power**, **Coins Multiplier**, **Offline Earnings**) positioned cleanly inside the underground foundation with **Press-and-Hold Auto-Upgrade**
+  - [x] `localStorage` auto-save with schema migration and two-step inline progress reset in Settings
   - [x] Offline earnings calculation and claim modal on return
-- [x] **Unlockable Cannon Varieties, Add-Ons, Skins & Arena Themes**
+- [x] **5-Tab Hangar & Codex (Cannons, Add-Ons, Skins, Arenas & Guide)**
+  - [x] **Gear Unlock Toasts (`🔓 NEW GEAR UNLOCKED!`)** and pulsing notification badge (`#hangar-notif-dot`) when new gear unlocks
   - [x] **5 Cannon Varieties (Chassis)**: **Vulcan Striker**, **Scatter Flak** (+2 fan spread barrels), **Heavy Railgun** (2.4x DMG piercing slugs), **Plasma Gatling** (1.55x fire rate + crit), and **Siege Blast** (area splash mortar)
   - [x] **5 Tactical Add-Ons**: **Wingman Drones** (🛸 homing plasma pods), **Holo-Scope Sight** (🎯 +18% crit chance & +0.5x crit DMG), **Bumper Buzzsaw** (⚙️ parries & slices low boulders), **Arc Tesla Pylon** (🌩️ chain lightning zaps), and **Sub-Zero Bumper** (❄️ floor bounces chill & damage rocks)
   - [x] **8 Cannon Skins**: *Classic Azure*, *Crimson Vanguard*, *Emerald Viper*, *Golden Sovereign*, *Solar Flare*, *Cyber Neon*, *Void Obsidian*, and *Starlight Prism*
   - [x] **7 Visual Arena Themes**: *Midnight Peaks*, *Ember Canyon*, *Bio-Lab Reactor*, *Frostbite Tundra*, *Synthwave Grid*, *Magma Caldera*, and *Deep Nebula*
+  - [x] **Codex Tab (`📖 Codex`)**: Full visual reference for all 8 Power-Up Orbs and Special Boulder Types
 - [x] **Stats, Achievements, Controls & Audio**
   - [x] Lifetime stats dashboard & 10 milestone achievements with live progress bars, coin rewards, and unlock toasts
-  - [x] Pointer/touch drag controls + Keyboard (`ArrowLeft`, `ArrowRight`, `Space`) support
+  - [x] Pointer/touch drag controls + Keyboard (`ArrowLeft`, `ArrowRight`, `Space`, `P`/`Esc`) support
   - [x] Zero-asset Web Audio API SFX & procedural synthwave background music with independent **SFX Volume** and **Music Volume** sliders
-  - [x] Mobile **Haptic Feedback** toggle (`navigator.vibrate`)
+  - [x] Mobile **Haptic Feedback** supporting both Android (`navigator.vibrate`) and iOS 18+ Safari (`<input type="checkbox" switch>` Taptic Engine)
   - [x] Screen shake, shockwave rings, particle bursts, floating popups, and "Second Wind" free revive shield

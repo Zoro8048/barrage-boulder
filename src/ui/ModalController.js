@@ -55,6 +55,7 @@ export class ModalController {
     this.statsBtn = document.getElementById('stats-btn');
     this.settingsBtn = document.getElementById('settings-btn');
     this.modeToggleBtn = document.getElementById('mode-toggle-btn');
+    this.lobbyLoadoutBtn = document.getElementById('lobby-loadout-btn');
     this.openSkinsFooterBtn = document.getElementById('open-skins-footer-btn');
     this.openStatsFooterBtn = document.getElementById('open-stats-footer-btn');
     this.openDisclaimerBtn = document.getElementById('open-disclaimer-btn');
@@ -119,19 +120,47 @@ export class ModalController {
       this.gameoverModalEl.classList.add('hidden');
     });
 
-    // Upgrade Card Clicks
+    // Upgrade Card Clicks & Press-and-Hold Auto-Upgrade
+    let holdTimeout = null;
+    let holdInterval = null;
+    const stopHoldUpgrade = () => {
+      if (holdTimeout) clearTimeout(holdTimeout);
+      if (holdInterval) clearInterval(holdInterval);
+      holdTimeout = null;
+      holdInterval = null;
+    };
+
     document.querySelectorAll('.upgrade-card').forEach((btn) => {
+      const type = btn.getAttribute('data-upgrade');
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
         this.audioService.init();
-        const type = btn.getAttribute('data-upgrade');
         this.engine.buyUpgrade(type);
       });
+      btn.addEventListener('pointerdown', (e) => {
+        e.stopPropagation();
+        stopHoldUpgrade();
+        holdTimeout = setTimeout(() => {
+          holdInterval = setInterval(() => {
+            if (!this.engine.buyUpgrade(type)) {
+              stopHoldUpgrade();
+            }
+          }, 110);
+        }, 340);
+      });
+      btn.addEventListener('pointerup', stopHoldUpgrade);
+      btn.addEventListener('pointerleave', stopHoldUpgrade);
+      btn.addEventListener('pointercancel', stopHoldUpgrade);
     });
 
     // Modal Open Buttons
     const openSkins = () => {
       this.audioService.init();
+      if (this.engine.saveManager.state.hasUnseenGear) {
+        this.engine.saveManager.state.hasUnseenGear = false;
+        this.engine.saveManager.persist();
+        this.bus.emit('state:updated', this.engine.saveManager.state);
+      }
       this.renderSkinsModal();
       this.skinsModalEl.classList.remove('hidden');
     };
@@ -154,6 +183,7 @@ export class ModalController {
     };
 
     this.skinsBtn.addEventListener('click', openSkins);
+    this.lobbyLoadoutBtn?.addEventListener('click', openSkins);
     this.openSkinsFooterBtn?.addEventListener('click', openSkins);
     this.statsBtn.addEventListener('click', openStats);
     this.openStatsFooterBtn?.addEventListener('click', openStats);
@@ -350,6 +380,7 @@ export class ModalController {
           this.engine.saveManager.persist();
           this.audioService.playUpgrade();
           this.updateUpgradeButtons();
+          this.bus.emit('state:updated', save);
           this.renderSkinsModal();
         };
       });
@@ -381,6 +412,7 @@ export class ModalController {
           save.equipped.addon = id;
           this.engine.saveManager.persist();
           this.audioService.playUpgrade();
+          this.bus.emit('state:updated', save);
           this.renderSkinsModal();
         };
       });

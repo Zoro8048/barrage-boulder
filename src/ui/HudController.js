@@ -27,11 +27,16 @@ export class HudController {
     this.powerupHudEl = document.getElementById('powerup-hud');
     this.achToastEl = document.getElementById('achievement-toast');
     this.achToastIconEl = document.getElementById('ach-toast-icon');
+    this.achToastLabelEl = document.getElementById('ach-toast-label');
     this.achToastTitleEl = document.getElementById('ach-toast-title');
+    this.hangarNotifDotEl = document.getElementById('hangar-notif-dot');
     this.startPromptEl = document.getElementById('start-prompt');
     this.startPromptWaveEl = document.getElementById('start-prompt-wave');
+    this.wavePrevBtn = document.getElementById('wave-prev-btn');
+    this.waveNextBtn = document.getElementById('wave-next-btn');
     this.startPromptTextEl = document.getElementById('start-prompt-text');
     this.lobbyModeWrapEl = document.getElementById('lobby-mode-wrap');
+    this.lobbyLoadoutBtn = document.getElementById('lobby-loadout-btn');
     this.upgradePanelEl = document.getElementById('upgrade-panel');
     this.pauseBtn = document.getElementById('pause-btn');
     this.waveBannerEl = document.getElementById('wave-banner');
@@ -95,6 +100,21 @@ export class HudController {
       this.showAchievementToast(ach);
     });
 
+    this.bus.on('gear:unlocked', (gear) => {
+      this.updateHUD();
+      this.showGearToast(gear);
+    });
+
+    this.wavePrevBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.engine.selectWave(-1);
+    });
+
+    this.waveNextBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.engine.selectWave(1);
+    });
+
     this.bus.on('run:started', () => {
       this.startPromptEl.classList.add('hidden');
       this.lobbyModeWrapEl?.classList.add('hidden');
@@ -132,6 +152,21 @@ export class HudController {
         ? `👑 BOSS RUSH • WAVE ${save.wave}`
         : `WAVE ${save.wave}`;
       this.startPromptWaveEl.classList.toggle('boss-rush', isBossRush);
+    }
+    if (this.wavePrevBtn) {
+      this.wavePrevBtn.classList.toggle('hidden', save.wave <= 1);
+    }
+    if (this.waveNextBtn) {
+      const maxWave = Math.max(1, save.stats.highestWave || save.wave);
+      this.waveNextBtn.classList.toggle('hidden', save.wave >= maxWave);
+    }
+    if (this.lobbyLoadoutBtn) {
+      const c = this.engine.saveManager.getActiveCannon();
+      const a = this.engine.saveManager.getActiveAddon();
+      this.lobbyLoadoutBtn.textContent = `${c.icon} ${c.name} • ${a.icon} ${a.name}`;
+    }
+    if (this.hangarNotifDotEl) {
+      this.hangarNotifDotEl.classList.toggle('hidden', !save.hasUnseenGear);
     }
     if (this.startPromptTextEl) {
       this.startPromptTextEl.textContent = 'DRAG TO AIM & FIRE';
@@ -192,6 +227,7 @@ export class HudController {
   }
 
   showAchievementToast(ach) {
+    if (this.achToastLabelEl) this.achToastLabelEl.textContent = 'ACHIEVEMENT UNLOCKED!';
     this.achToastIconEl.textContent = ach.icon;
     this.achToastTitleEl.textContent = `${ach.name} (+${ach.reward} 🪙)`;
     this.achToastEl.classList.remove('hidden');
@@ -199,5 +235,16 @@ export class HudController {
     this.toastTimeout = setTimeout(() => {
       this.achToastEl.classList.add('hidden');
     }, 3200);
+  }
+
+  showGearToast({ category, name, icon }) {
+    if (this.achToastLabelEl) this.achToastLabelEl.textContent = `🔓 NEW ${category} UNLOCKED!`;
+    this.achToastIconEl.textContent = icon || '🎨';
+    this.achToastTitleEl.textContent = `${name} (Tap 🎨 Hangar)`;
+    this.achToastEl.classList.remove('hidden');
+    if (this.toastTimeout) clearTimeout(this.toastTimeout);
+    this.toastTimeout = setTimeout(() => {
+      this.achToastEl.classList.add('hidden');
+    }, 3400);
   }
 }

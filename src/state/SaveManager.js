@@ -43,6 +43,8 @@ export function createDefaultSave(now = Date.now()) {
       runsPlayed: 0,
     },
     unlockedAchievements: [],
+    unlockedGear: ['cannon:striker', 'addon:wingmanDrones', 'skin:classic', 'theme:midnight'],
+    hasUnseenGear: false,
     lastTimestamp: now,
   };
 }
@@ -66,6 +68,10 @@ export function migrateSaveData(parsed, now = Date.now()) {
     unlockedAchievements: Array.isArray(parsed.unlockedAchievements)
       ? [...parsed.unlockedAchievements]
       : [],
+    unlockedGear: Array.isArray(parsed.unlockedGear)
+      ? [...parsed.unlockedGear]
+      : [...def.unlockedGear],
+    hasUnseenGear: Boolean(parsed.hasUnseenGear),
   };
 }
 

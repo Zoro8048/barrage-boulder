@@ -96,12 +96,23 @@ export class CanvasRenderer {
     // Power-up Orbs
     this.drawPowerups(engine.powerups);
 
-    // Bullets
+    // Bullets & Distinct Power-Up Projectiles
     this.drawBullets(engine.bullets, skin);
 
-    // Orbital Ultimate Beam
-    if (engine.ultimateBeamTimer > 0) {
-      this.drawUltimateBeam(engine);
+    // Pierce Beam Laser Lances
+    if (engine.laserBeams && engine.laserBeams.length > 0) {
+      this.drawLaserBeams(engine.laserBeams);
+    }
+
+    // Incoming Boulder Spawn Lane Warning Indicator
+    if (engine.gameState === 'PLAYING') {
+      const warning = engine.waveSystem.getPendingWarning(
+        engine.rocks,
+        engine.saveManager.state.wave
+      );
+      if (warning) {
+        this.drawSpawnWarning(warning, width, time);
+      }
     }
 
     // Rocks
@@ -112,7 +123,7 @@ export class CanvasRenderer {
     // Cannon & Wingman Drones
     this.drawCannon(skin);
 
-    // Ground
+    // Ground & Underground Thumb Trackpad Zone
     this.drawGround(theme, width, height, groundY);
 
     // Particles
@@ -168,7 +179,7 @@ export class CanvasRenderer {
   }
 
   drawGround(theme, width, height, groundY) {
-    const { ctx } = this;
+    const { ctx, engine } = this;
     ctx.fillStyle = theme.grassTop;
     ctx.fillRect(0, groundY, width, 8);
     ctx.fillStyle = theme.grassSub;
@@ -179,6 +190,36 @@ export class CanvasRenderer {
     earthGrad.addColorStop(1, theme.earthBot);
     ctx.fillStyle = earthGrad;
     ctx.fillRect(0, groundY + 13, width, height - groundY - 13);
+
+    // Underground Ergonomic Thumb Trackpad Zone (shown during active gameplay so thumb never blocks cannon)
+    if (engine.gameState === 'PLAYING') {
+      const trackY = groundY + (height - groundY) * 0.56;
+      const trackLeft = 36;
+      const trackRight = width - 36;
+      const trackW = Math.max(80, trackRight - trackLeft);
+
+      ctx.save();
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
+      ctx.beginPath();
+      ctx.roundRect(trackLeft, trackY - 3, trackW, 6, 3);
+      ctx.fill();
+
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.32)';
+      ctx.font = '800 9px -apple-system, BlinkMacSystemFont, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('◀ DRAG THUMB HERE ▶', width / 2, trackY + 18);
+
+      // Glowing thumb position indicator synced with cannon.x
+      const puckX = Math.max(trackLeft, Math.min(trackRight, engine.cannon.x));
+      ctx.beginPath();
+      ctx.arc(puckX, trackY, 8, 0, Math.PI * 2);
+      ctx.fillStyle = '#38b6ff';
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = '#ffffff';
+      ctx.stroke();
+      ctx.restore();
+    }
   }
 
   drawCoins(coins) {
@@ -271,53 +312,135 @@ export class CanvasRenderer {
         continue;
       }
 
-      const grad = ctx.createLinearGradient(b.x, b.y - 12, b.x, b.y + 12);
-      if (b.isPierce) {
-        grad.addColorStop(0, '#ffffff');
-        grad.addColorStop(0.4, '#d980fa');
-        grad.addColorStop(1, '#8e44ad');
-      } else if (b.splashRadius > 0) {
-        grad.addColorStop(0, '#ffffff');
-        grad.addColorStop(0.4, '#ff7979');
-        grad.addColorStop(1, '#eb2f06');
-      } else if (b.overdrive) {
-        grad.addColorStop(0, '#ffffff');
-        grad.addColorStop(0.4, '#48dbfb');
-        grad.addColorStop(1, '#0abde3');
-      } else {
-        grad.addColorStop(0, skin.bulletTop);
-        grad.addColorStop(0.4, skin.bulletMid);
-        grad.addColorStop(1, skin.bulletBot);
+      // 1. Saw Calibre: Spinning serrated fiery sawblade disc
+      if (b.shape === 'saw') {
+        ctx.translate(b.x, b.y);
+        ctx.rotate(b.spinAngle || 0);
+        ctx.beginPath();
+        ctx.arc(0, 0, b.radius, 0, Math.PI * 2);
+        ctx.fillStyle = '#ff9f1a';
+        ctx.fill();
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = '#ff3838';
+        ctx.setLineDash([4, 3]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.beginPath();
+        ctx.arc(0, 0, 4, 0, Math.PI * 2);
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
+        ctx.restore();
+        continue;
       }
+
+      // 2. Ricochet Fan: Spinning 4-point star blade
+      if (b.shape === 'star') {
+        ctx.translate(b.x, b.y);
+        ctx.rotate(b.spinAngle || 0);
+        ctx.fillStyle = '#ff9f1a';
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        for (let p = 0; p < 8; p++) {
+          const rad = p % 2 === 0 ? b.radius * 1.35 : b.radius * 0.45;
+          const ang = (p * Math.PI) / 4;
+          if (p === 0) ctx.moveTo(Math.cos(ang) * rad, Math.sin(ang) * rad);
+          else ctx.lineTo(Math.cos(ang) * rad, Math.sin(ang) * rad);
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+        continue;
+      }
+
+      // 3. Blast Shells: Heavy cluster mortar bomb or shrapnel spark
+      if (b.shape === 'bomb' || b.shape === 'shrapnel') {
+        ctx.translate(b.x, b.y);
+        ctx.beginPath();
+        ctx.arc(0, 0, b.radius * 1.15, 0, Math.PI * 2);
+        ctx.fillStyle = b.shape === 'bomb' ? '#eb2f06' : '#ff9f1a';
+        ctx.fill();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = '#fffa65';
+        ctx.stroke();
+        ctx.restore();
+        continue;
+      }
+
+      // 4. Overdrive: Twin electric cyan hyper-tracer needle
+      if (b.shape === 'needle') {
+        ctx.fillStyle = '#48dbfb';
+        ctx.beginPath();
+        ctx.roundRect(b.x - 2.5, b.y - 14, 5, 28, 2.5);
+        ctx.fill();
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(b.x - 1, b.y - 12, 2, 20);
+        ctx.restore();
+        continue;
+      }
+
+      // Standard Cannon Bullet
+      const grad = ctx.createLinearGradient(b.x, b.y - 12, b.x, b.y + 12);
+      grad.addColorStop(0, skin.bulletTop);
+      grad.addColorStop(0.4, skin.bulletMid);
+      grad.addColorStop(1, skin.bulletBot);
       ctx.fillStyle = grad;
-      const bw = b.isGiant ? 14 : 8;
-      const bh = b.isGiant ? 26 : b.isPierce ? 24 : 18;
       ctx.beginPath();
-      ctx.roundRect(b.x - bw / 2, b.y - bh / 2, bw, bh, bw / 2);
+      ctx.roundRect(b.x - 4, b.y - 9, 8, 18, 4);
       ctx.fill();
       ctx.restore();
     }
   }
 
-  drawUltimateBeam(engine) {
+  drawLaserBeams(laserBeams) {
     const { ctx } = this;
-    const { cannon, ultimateBeamTimer } = engine;
-    const alpha = Math.min(1, ultimateBeamTimer * 1.4);
+    for (const beam of laserBeams) {
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, Math.min(1, beam.life));
+
+      // Outer magenta glow
+      const w = beam.width * 2.2;
+      const grad = ctx.createLinearGradient(beam.x - w / 2, 0, beam.x + w / 2, 0);
+      grad.addColorStop(0, 'rgba(217, 128, 250, 0)');
+      grad.addColorStop(0.3, 'rgba(217, 128, 250, 0.65)');
+      grad.addColorStop(0.5, '#ffffff');
+      grad.addColorStop(0.7, 'rgba(217, 128, 250, 0.65)');
+      grad.addColorStop(1, 'rgba(217, 128, 250, 0)');
+
+      ctx.fillStyle = grad;
+      ctx.fillRect(beam.x - w / 2, 0, w, beam.y);
+
+      // Core white laser line
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(beam.x - 2, 0, 4, beam.y);
+      ctx.restore();
+    }
+  }
+
+  drawSpawnWarning(warning, width, time) {
+    const { ctx } = this;
+    const pulse = 0.55 + 0.45 * Math.sin(time * 0.02);
+    const x = warning.fromLeft ? 22 : width - 22;
+    const y = warning.y;
+    const color = warning.isBoss ? '#ff4757' : warning.variant === 'fast' ? '#ff9f1a' : '#ffcf33';
 
     ctx.save();
-    ctx.globalAlpha = alpha;
+    ctx.globalAlpha = pulse;
+    ctx.fillStyle = 'rgba(10, 14, 28, 0.85)';
+    ctx.beginPath();
+    ctx.arc(x, y, 14, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = color;
+    ctx.stroke();
 
-    // Wide outer plasma pillar
-    const beamGrad = ctx.createLinearGradient(cannon.x - 45, 0, cannon.x + 45, 0);
-    beamGrad.addColorStop(0, 'rgba(72, 219, 251, 0)');
-    beamGrad.addColorStop(0.25, 'rgba(72, 219, 251, 0.55)');
-    beamGrad.addColorStop(0.5, 'rgba(255, 255, 255, 0.95)');
-    beamGrad.addColorStop(0.75, 'rgba(72, 219, 251, 0.55)');
-    beamGrad.addColorStop(1, 'rgba(72, 219, 251, 0)');
-
-    ctx.fillStyle = beamGrad;
-    ctx.fillRect(cannon.x - 45, 0, 90, cannon.y - 36);
-
+    ctx.fillStyle = color;
+    ctx.font = '900 11px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const badge = warning.isBoss ? '👑' : warning.variant === 'fast' ? '☄️' : warning.fromLeft ? '▶' : '◀';
+    ctx.fillText(badge, x, y + 0.5);
     ctx.restore();
   }
 
@@ -467,6 +590,20 @@ export class CanvasRenderer {
         ? `rgba(46, 213, 115, ${0.85 * pulse})`
         : `rgba(72, 219, 251, ${0.8 * pulse})`;
       ctx.stroke();
+    }
+
+    // Magnet Vortex rotating golden gravity ring
+    if (activePowerups.magnet > 0) {
+      ctx.save();
+      ctx.translate(0, -22);
+      ctx.rotate(performance.now() * 0.004);
+      ctx.beginPath();
+      ctx.arc(0, 0, 48, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(255, 207, 51, 0.78)';
+      ctx.lineWidth = 2.5;
+      ctx.setLineDash([8, 6]);
+      ctx.stroke();
+      ctx.restore();
     }
 
     if (cannon.muzzleFlash > 0) {

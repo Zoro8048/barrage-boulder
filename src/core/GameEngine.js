@@ -39,11 +39,12 @@ export class GameEngine {
     this.shakeTimer = 0;
     this.shakeIntensity = 0;
 
-    // Combo & Ultimate Skill State
+    // Combo & Fatal Slow-Mo State
     this.comboCount = 0;
     this.comboTimer = 0;
     this.ultimateCharge = 0;
     this.ultimateBeamTimer = 0;
+    this.deathSlowMoTimer = 0;
 
     this.activePowerups = {
       rapidFire: 0,
@@ -68,6 +69,7 @@ export class GameEngine {
     this.powerups = [];
     this.particles = [];
     this.shockwaves = [];
+    this.laserBeams = [];
     this.floatingTexts = [];
 
     // Object Pools for high-frequency objects
@@ -160,15 +162,21 @@ export class GameEngine {
     return true;
   }
 
-  addUltimateCharge(amount) {
-    const prev = this.ultimateCharge;
-    this.ultimateCharge = Math.min(100, this.ultimateCharge + amount);
-    if (this.ultimateCharge !== prev) {
-      this.bus.emit('ultimate:updated', this.ultimateCharge);
-    }
-    if (this.ultimateCharge >= 100 && this.gameState === 'PLAYING' && this.rocks.length > 0) {
-      this.activateUltimate();
-    }
+  selectWave(delta) {
+    if (this.gameState !== 'LOBBY') return false;
+    const save = this.saveManager.state;
+    const maxWave = Math.max(1, save.stats.highestWave || save.wave);
+    const nextWave = Math.max(1, Math.min(maxWave, save.wave + delta));
+    if (nextWave === save.wave) return false;
+    save.wave = nextWave;
+    this.saveManager.persist();
+    this.setupCurrentWave();
+    this.bus.emit('run:lobby');
+    return true;
+  }
+
+  addUltimateCharge() {
+    // Repetitive auto-Supernova removed so power-ups shine individually
   }
 
   activateUltimate() {
@@ -396,15 +404,26 @@ export class GameEngine {
     this.bus.emit('run:lobby');
   }
 
-  triggerGameOver() {
-    if (this.gameState === 'GAMEOVER') return;
-    this.gameState = 'GAMEOVER';
+  triggerGameOver(fatalRock = null) {
+    if (this.gameState === 'GAMEOVER' || this.gameState === 'DYING') return;
+    this.gameState = 'DYING';
+    this.deathSlowMoTimer = 0.38;
     this.comboCount = 0;
     this.comboTimer = 0;
     this.bus.emit('combo:updated', { count: 0, multiplier: 1 });
-    this.triggerShake(14, 0.35);
-    this.addParticles(this.cannon.x, this.cannon.y - 18, '#38b6ff', 28, 280);
+    this.triggerShake(16, 0.38);
+    this.addShockwave(this.cannon.x, this.cannon.y - 24, 115, '#ff4757');
+    this.addParticles(this.cannon.x, this.cannon.y - 18, '#ff4757', 24, 260);
+    this.addParticles(this.cannon.x, this.cannon.y - 18, '#38b6ff', 18, 220);
+    if (fatalRock) {
+      fatalRock.hitFlash = 0.8;
+      fatalRock.hitScale = 1.25;
+    }
+  }
 
+  finalizeGameOver() {
+    if (this.gameState === 'GAMEOVER') return;
+    this.gameState = 'GAMEOVER';
     this.bus.emit('run:gameover', {
       wave: this.saveManager.state.wave,
       score: this.score,
@@ -415,6 +434,7 @@ export class GameEngine {
 
   reviveRun() {
     this.usedRevive = true;
+    this.deathSlowMoTimer = 0;
     this.invulnerableTimer = PHYSICS.REVIVE_SHIELD_DURATION;
     this.gameState = 'PLAYING';
 
@@ -450,6 +470,7 @@ export class GameEngine {
     this.powerups = [];
     this.particles = [];
     this.shockwaves = [];
+    this.laserBeams = [];
     this.floatingTexts = [];
 
     this.setupCurrentWave();
@@ -475,6 +496,15 @@ export class GameEngine {
     }
 
     if (this.gameState === 'PAUSED' || isModalOpen) {
+      return;
+    }
+
+    if (this.gameState === 'DYING') {
+      this.deathSlowMoTimer -= dt;
+      this.physicsSystem.updateVFX(dt * 0.4, this);
+      if (this.deathSlowMoTimer <= 0) {
+        this.finalizeGameOver();
+      }
       return;
     }
 

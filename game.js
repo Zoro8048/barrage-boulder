@@ -492,43 +492,43 @@
       icon: '⚡',
       shortTag: '2x SPEED',
       label: 'OVERDRIVE',
-      hudDesc: '1.85x Fire Speed',
+      hudDesc: '1.85x Twin Hyper-Tracers',
       color: '#48dbfb',
       duration: 8,
     },
     spreadShot: {
       id: 'spreadShot',
       icon: '🔱',
-      shortTag: 'SPREAD',
-      label: 'SPREAD FAN',
-      hudDesc: '+2 Wide Wing Streams',
+      shortTag: 'BOUNCE',
+      label: 'RICOCHET FAN',
+      hudDesc: 'Wall-Bouncing Star Blades',
       color: '#ff9f1a',
       duration: 8.5,
     },
     explosiveRounds: {
       id: 'explosiveRounds',
       icon: '💣',
-      shortTag: 'SPLASH',
+      shortTag: 'CLUSTER',
       label: 'BLAST SHELLS',
-      hudDesc: '50% Area Splash DMG',
+      hudDesc: 'Blast Ring + 3 Shrapnel',
       color: '#ff4757',
       duration: 8,
     },
     piercingLaser: {
       id: 'piercingLaser',
       icon: '🔦',
-      shortTag: 'PIERCE',
+      shortTag: 'LASER',
       label: 'PIERCE BEAM',
-      hudDesc: 'Shots Pass Thru Rocks',
+      hudDesc: 'Instant Column Laser Lance',
       color: '#d980fa',
       duration: 7.5,
     },
     giantBullets: {
       id: 'giantBullets',
       icon: '🔥',
-      shortTag: '2x DMG',
-      label: 'MEGA CALIBRE',
-      hudDesc: '2x DMG & Knockback',
+      shortTag: 'SAW 2X',
+      label: 'SAW CALIBRE',
+      hudDesc: '2x DMG Saw + Cracks Armor',
       color: '#ffa502',
       duration: 8,
     },
@@ -536,8 +536,8 @@
       id: 'shield',
       icon: '🛡️',
       shortTag: 'SHIELD',
-      label: 'FORCE SHIELD',
-      hudDesc: 'Repels Rock Hits',
+      label: 'PLASMA DOME',
+      hudDesc: 'Zaps & Repels Boulders',
       color: '#2ed573',
       duration: 8.5,
     },
@@ -545,17 +545,17 @@
       id: 'magnet',
       icon: '🧲',
       shortTag: '2x COINS',
-      label: 'MAGNET 2X',
-      hudDesc: '1.5x Coins + Vacuum',
+      label: 'MAGNET VORTEX',
+      hudDesc: '1.5x Coins + Vortex Pull',
       color: '#ffcf33',
       duration: 10,
     },
     freeze: {
       id: 'freeze',
       icon: '❄️',
-      shortTag: 'SLOW',
-      label: 'CRYO SLOW',
-      hudDesc: 'Slows Rocks by 55%',
+      shortTag: 'FROST',
+      label: 'CRYO BLIZZARD',
+      hudDesc: '55% Slow + 25% Shatter DMG',
       color: '#7ed6df',
       duration: 7.5,
     },
@@ -899,6 +899,8 @@
         runsPlayed: 0,
       },
       unlockedAchievements: [],
+      unlockedGear: ['cannon:striker', 'addon:wingmanDrones', 'skin:classic', 'theme:midnight'],
+      hasUnseenGear: false,
       lastTimestamp: now,
     };
   }
@@ -921,6 +923,10 @@
       unlockedAchievements: Array.isArray(parsed.unlockedAchievements)
         ? [...parsed.unlockedAchievements]
         : [],
+      unlockedGear: Array.isArray(parsed.unlockedGear)
+        ? [...parsed.unlockedGear]
+        : [...def.unlockedGear],
+      hasUnseenGear: Boolean(parsed.hasUnseenGear),
     };
   }
   class SaveManager {
@@ -994,6 +1000,36 @@
     checkUnlockables() {
       const save = this.saveManager.state;
       const newlyUnlocked = [];
+      let gearUnlocked = false;
+  
+      if (!Array.isArray(save.unlockedGear)) {
+        save.unlockedGear = ['cannon:striker', 'addon:wingmanDrones', 'skin:classic', 'theme:midnight'];
+      }
+  
+      const gearCatalogs = [
+        { prefix: 'cannon', label: 'CANNON', items: CANNON_VARIETIES },
+        { prefix: 'addon', label: 'ADD-ON', items: CANNON_ADDONS },
+        { prefix: 'skin', label: 'SKIN', items: CANNON_SKINS },
+        { prefix: 'theme', label: 'ARENA', items: ARENA_THEMES },
+      ];
+  
+      for (const cat of gearCatalogs) {
+        for (const item of cat.items) {
+          const key = `${cat.prefix}:${item.id}`;
+          if (!save.unlockedGear.includes(key) && item.isUnlocked(save)) {
+            save.unlockedGear.push(key);
+            save.hasUnseenGear = true;
+            gearUnlocked = true;
+            if (this.bus) {
+              this.bus.emit('gear:unlocked', {
+                category: cat.label,
+                name: item.name,
+                icon: item.icon || '🎨',
+              });
+            }
+          }
+        }
+      }
   
       for (const ach of ACHIEVEMENTS) {
         if (save.unlockedAchievements.includes(ach.id)) continue;
@@ -1009,7 +1045,7 @@
         }
       }
   
-      if (newlyUnlocked.length > 0) {
+      if (newlyUnlocked.length > 0 || gearUnlocked) {
         this.saveManager.persist();
         if (this.bus) {
           this.bus.emit('state:updated', save);
@@ -1218,6 +1254,8 @@
             isBoss: true,
             isMilestone,
             variant,
+            fromLeft: rng() < 0.5,
+            spawnYRatio: rng(),
           });
         }
       } else {
@@ -1254,6 +1292,8 @@
             isBoss,
             isMilestone: variant === 'milestoneBoss',
             variant,
+            fromLeft: rng() < 0.5,
+            spawnYRatio: rng(),
           });
         }
       }
@@ -1293,13 +1333,32 @@
       }
     }
   
+    getPendingWarning(activeRocks, waveNum) {
+      if (this.waveRocksToSpawn.length === 0 || this.spawnTimer > 0.65) return null;
+      const activeWeight = activeRocks.reduce(
+        (sum, r) => sum + (r.size === 3 ? 2.0 : r.size === 2 ? 1.35 : 0.85),
+        0
+      );
+      const maxWeight = 4.2 + Math.min(2.5, Math.floor(waveNum / 6) * 0.5);
+      if (activeRocks.length > 0 && activeWeight >= maxWeight) return null;
+      const next = this.waveRocksToSpawn[0];
+      return {
+        fromLeft: next.fromLeft ?? true,
+        y: 95 + (next.spawnYRatio ?? 0.5) * 80,
+        isBoss: next.isBoss,
+        variant: next.variant,
+        size: next.size,
+        urgency: 1 - Math.max(0, this.spawnTimer) / 0.65,
+      };
+    }
+  
     spawnNextRock(activeRocks, width) {
       if (this.waveRocksToSpawn.length === 0) return null;
       const spec = this.waveRocksToSpawn.shift();
-      const fromLeft = Math.random() < 0.5;
+      const fromLeft = spec.fromLeft !== undefined ? spec.fromLeft : Math.random() < 0.5;
       const radius = ROCK_RADII[spec.size] || 38;
       const x = fromLeft ? -radius * 0.5 : width + radius * 0.5;
-      const y = 90 + Math.random() * 85;
+      const y = 95 + (spec.spawnYRatio !== undefined ? spec.spawnYRatio : Math.random()) * 80;
       const baseSpeed = spec.variant === 'fast' ? 140 + Math.random() * 65 : 75 + Math.random() * 55;
       const speedX = (fromLeft ? 1 : -1) * baseSpeed;
   
@@ -1456,6 +1515,20 @@
       const addon = saveManager.getActiveAddon();
       const globalScale = activePowerups.freeze > 0 ? PHYSICS.CRYO_TIME_SCALE : 1;
   
+      // Cryo Blizzard ambient falling snow particles
+      if (activePowerups.freeze > 0 && Math.random() < 0.3) {
+        engine.spawnParticle({
+          x: Math.random() * width,
+          y: 60 + Math.random() * 80,
+          vx: (Math.random() - 0.5) * 40,
+          vy: 50 + Math.random() * 40,
+          r: 2 + Math.random() * 2,
+          color: '#7ed6df',
+          life: 0.85,
+          decay: 1.1,
+        });
+      }
+  
       for (let i = rocks.length - 1; i >= 0; i--) {
         const r = rocks[i];
         if (r.chillTimer > 0) r.chillTimer = Math.max(0, r.chillTimer - dt);
@@ -1534,7 +1607,13 @@
               r.y = Math.min(r.y, cannonCenterY - hitDist - 4);
               this.bus.emit('sfx:hit', { hpRatio: 0.2, armored: true });
               engine.triggerShake(6, 0.14);
-              engine.addParticles(r.x, r.y + r.radius * 0.5, '#2ed573', 10, 180);
+              engine.addShockwave(cannon.x, cannonCenterY, 75, 'rgba(46, 213, 115, 0.85)');
+              engine.addParticles(r.x, r.y + r.radius * 0.5, '#2ed573', 12, 190);
+              if (activePowerups.shield > 0) {
+                const zapDmg = Math.max(2, Math.round(engine.getBulletDamage() * 3.2));
+                engine.addFloatingText(r.x, r.y - 14, `🛡️ DOME ZAP!`, '#2ed573', 13);
+                combatSystem.applyDamageToRock(r, zapDmg, engine, { isCrit: true });
+              }
             } else if (addon.id === 'sawBlade' && cannon.sawCooldown <= 0) {
               // Bumper Buzzsaw slices rock and bounces it skyward!
               cannon.sawCooldown = 2.5;
@@ -1547,7 +1626,7 @@
               const sawDmg = Math.max(2, Math.round(engine.getBulletDamage() * 4.5));
               combatSystem.applyDamageToRock(r, sawDmg, engine, { isCrit: true });
             } else {
-              engine.triggerGameOver();
+              engine.triggerGameOver(r);
               break;
             }
           }
@@ -1643,7 +1722,14 @@
     }
   
     updateVFX(dt, engine) {
-      const { shockwaves, particles, floatingTexts, particlePool, textPool } = engine;
+      const { shockwaves, laserBeams, particles, floatingTexts, particlePool, textPool } = engine;
+  
+      if (laserBeams) {
+        for (let i = laserBeams.length - 1; i >= 0; i--) {
+          laserBeams[i].life -= dt * 6.5;
+          if (laserBeams[i].life <= 0) laserBeams.splice(i, 1);
+        }
+      }
   
       for (let i = shockwaves.length - 1; i >= 0; i--) {
         const sw = shockwaves[i];
@@ -1711,7 +1797,48 @@
       const pierceLeft = (isPierce ? 3 : 0) + (variety.pierceCount || 0);
       const splashRadius = isExplosive ? 95 : variety.splashRadius || 0;
       const dmgRatio = (variety.damageMult || 1) * (isGiant ? 2.0 : 1.0);
-      const bulletRadius = isGiant ? 10 : variety.id === 'railgun' ? 7 : isOverdrive ? 6.2 : 5.5;
+      const bulletRadius = isGiant ? 11.5 : variety.id === 'railgun' ? 7 : isOverdrive ? 6 : 5.5;
+  
+      // Determine distinct projectile shape so every power-up looks and feels unique
+      const bulletShape = isGiant
+        ? 'saw'
+        : isExplosive
+        ? 'bomb'
+        : isSpreadPowerup
+        ? 'star'
+        : isOverdrive
+        ? 'needle'
+        : 'standard';
+  
+      // Pierce Beam Power-Up: Instant full-column neon magenta Laser Lance!
+      if (isPierce) {
+        const baseDmg = Math.max(1, Math.round(engine.getBulletDamage() * dmgRatio * 0.9));
+        for (let i = 0; i < barrels; i++) {
+          const offsetX = -totalSpan / 2 + i * spacing;
+          const beamX = cannon.x + offsetX;
+          engine.laserBeams.push({
+            x: beamX,
+            y: cannon.y - 48,
+            width: isGiant ? 18 : 11,
+            color: '#d980fa',
+            life: 1.0,
+          });
+  
+          // Hit every boulder intersecting the laser column
+          for (let j = engine.rocks.length - 1; j >= 0; j--) {
+            const r = engine.rocks[j];
+            if (!r) continue;
+            if (Math.abs(r.x - beamX) <= r.radius + 14) {
+              engine.addParticles(beamX, r.y + r.radius * 0.4, '#d980fa', 4, 130);
+              this.applyDamageToRock(r, baseDmg, engine, { isCrit: false, isLaser: true });
+            }
+          }
+        }
+        cannon.recoil = 4;
+        cannon.muzzleFlash = 1;
+        this.bus.emit('sfx:shoot', { overdrive: true });
+        return;
+      }
   
       for (let i = 0; i < barrels; i++) {
         const offsetX = -totalSpan / 2 + i * spacing;
@@ -1727,11 +1854,15 @@
             vx,
             vy,
             radius: bulletRadius,
+            shape: bulletShape,
+            spinAngle: 0,
+            bouncesLeft: isSpreadPowerup ? 2 : 0,
             overdrive: isOverdrive,
             isGiant,
             isPierce: pierceLeft > 0,
             pierceLeft,
             splashRadius,
+            spawnClusters: isExplosive,
             lastHitRock: null,
             isDrone: false,
             damageRatio: dmgRatio,
@@ -1739,24 +1870,28 @@
         );
       }
   
-      // Spread Fan Power-Up adds 2 angled wing shots
+      // Ricochet Fan Power-Up adds 2 wide-angle wall-bouncing Star Blades
       if (isSpreadPowerup) {
-        for (const sideAngle of [-0.26, 0.26]) {
+        for (const sideAngle of [-0.34, 0.34]) {
           bullets.push(
             bulletPool.acquire({
               x: cannon.x,
               y: cannon.y - 46,
               vx: Math.sin(sideAngle) * Math.abs(speed),
               vy: -Math.cos(sideAngle) * Math.abs(speed),
-              radius: bulletRadius * 0.9,
+              radius: 8,
+              shape: 'star',
+              spinAngle: Math.random() * Math.PI,
+              bouncesLeft: 2,
               overdrive: isOverdrive,
               isGiant,
               isPierce: pierceLeft > 0,
               pierceLeft,
               splashRadius,
+              spawnClusters: isExplosive,
               lastHitRock: null,
               isDrone: false,
-              damageRatio: dmgRatio * 0.85,
+              damageRatio: dmgRatio * 0.9,
             })
           );
         }
@@ -1836,9 +1971,12 @@
         return 0;
       }
   
+      const isFrozen = engine.activePowerups.freeze > 0 || r.chillTimer > 0;
+      const frostMult = isFrozen ? 1.25 : 1.0;
       const hasIntactArmor = r.variant === 'armored' && !r.armorBroken;
       const armorScale = ROCK_VARIANTS.armored.armorDamageScale;
-      const afterArmor = hasIntactArmor ? Math.max(1, Math.round(rawDmg * armorScale)) : rawDmg;
+      const boostedDmg = Math.max(1, Math.round(rawDmg * frostMult));
+      const afterArmor = hasIntactArmor ? Math.max(1, Math.round(boostedDmg * armorScale)) : boostedDmg;
       const actualDmg = Math.min(r.hp, afterArmor);
   
       r.hp -= actualDmg;
@@ -1853,8 +1991,6 @@
       if (engine.score > save.bestScore) {
         save.bestScore = engine.score;
       }
-  
-      engine.addUltimateCharge(COMBAT.ULTIMATE_CHARGE_PER_HIT);
   
       if (isCrit) {
         engine.addFloatingText(r.x, r.y - 12, `💥 ${formatNum(actualDmg)}!`, '#ff4757', 14);
@@ -1893,56 +2029,9 @@
       return actualDmg;
     }
   
-    triggerUltimate(engine) {
-      if (engine.gameState !== 'PLAYING' || engine.ultimateCharge < 100) return false;
-  
-      engine.ultimateCharge = 0;
-      engine.ultimateBeamTimer = COMBAT.ULTIMATE_BEAM_DURATION;
-      engine.invulnerableTimer = Math.max(engine.invulnerableTimer, 2.0);
-      engine.triggerShake(15, 0.4);
-      engine.addShockwave(engine.cannon.x, engine.cannon.y - 40, 420, 'rgba(72, 219, 251, 0.9)');
-      engine.addFloatingText(
-        engine.width / 2,
-        engine.height * 0.36,
-        '☄️ ORBITAL SUPERNOVA!',
-        '#48dbfb',
-        20
-      );
-  
-      const ultDamage = Math.max(15, Math.round(engine.getBulletDamage() * 14));
-      const save = engine.saveManager.state;
-  
-      for (let j = engine.rocks.length - 1; j >= 0; j--) {
-        const r = engine.rocks[j];
-        r.armorBroken = true;
-        r.bossShieldTimer = 0;
-        const actualDmg = Math.min(r.hp, ultDamage);
-        r.hp -= actualDmg;
-        engine.score += actualDmg;
-        engine.waveSystem.waveDamageDealt += actualDmg;
-        if (engine.score > save.bestScore) {
-          save.bestScore = engine.score;
-        }
-  
-        r.vy = -480;
-        r.hitScale = 1.3;
-        r.hitFlash = 0.6;
-        engine.addParticles(r.x, r.y, '#48dbfb', 10, 220);
-  
-        if (r.hp <= 0) {
-          this.destroyRock(r, j, engine, true);
-        }
-      }
-  
-      this.bus.emit('sfx:ultimate');
-      this.bus.emit('ultimate:updated', engine.ultimateCharge);
-      this.bus.emit('hud:scoreUpdated');
-      this.bus.emit('wave:updated', {
-        waveNum: save.wave,
-        damageDealt: engine.waveSystem.waveDamageDealt,
-        totalHP: engine.waveSystem.waveTotalHP,
-      });
-      return true;
+    triggerUltimate() {
+      // Removed repetitive upward-push wave so boulder physics stay natural
+      return false;
     }
   
     updateBullets(dt, engine) {
@@ -1961,8 +2050,26 @@
         const b = bullets[i];
         b.x += b.vx * dt;
         b.y += b.vy * dt;
+        if (b.shape === 'saw' || b.shape === 'star') {
+          b.spinAngle = (b.spinAngle || 0) + dt * 16;
+        }
   
-        if (b.y < -30 || b.y > engine.height + 20 || b.x < -20 || b.x > width + 20) {
+        // Ricochet Fan Star Blades bounce off left and right arena walls!
+        if (b.bouncesLeft > 0) {
+          if (b.x - b.radius < 0 && b.vx < 0) {
+            b.x = b.radius;
+            b.vx = Math.abs(b.vx);
+            b.bouncesLeft -= 1;
+            engine.addParticles(b.x, b.y, '#ff9f1a', 5, 110);
+          } else if (b.x + b.radius > width && b.vx > 0) {
+            b.x = width - b.radius;
+            b.vx = -Math.abs(b.vx);
+            b.bouncesLeft -= 1;
+            engine.addParticles(b.x, b.y, '#ff9f1a', 5, 110);
+          }
+        }
+  
+        if (b.y < -30 || b.y > engine.height + 20 || b.x < -25 || b.x > width + 25) {
           bullets.splice(i, 1);
           bulletPool.release(b);
           continue;
@@ -1977,27 +2084,43 @@
           if (distSq <= (r.radius + b.radius) ** 2) {
             b.lastHitRock = r;
   
+            // Saw Calibre blades instantly shred Armored boulder shields on contact!
+            if (b.shape === 'saw' && r.variant === 'armored' && !r.armorBroken) {
+              r.armorBroken = true;
+              engine.addParticles(r.x, r.y, '#ffa502', 14, 210);
+              engine.addFloatingText(r.x, r.y - r.radius, '🔥 SAW SHREDDED!', '#ffa502', 13);
+            }
+  
             const isCrit = !b.isDrone && Math.random() < critChance;
             const mult = isCrit ? critMult : 1.0;
             const scaledDmg = Math.max(1, Math.round(baseBulletDmg * (b.damageRatio || 1) * mult));
   
             const hasIntactArmor = r.variant === 'armored' && !r.armorBroken;
-            if (r.vy > -120) r.vy -= b.isGiant ? 28 : 12;
+            if (r.vy > -110) r.vy -= b.isGiant ? 20 : 10;
   
             this.bus.emit('sfx:hit', { hpRatio: r.hp / r.maxHp, armored: hasIntactArmor });
             engine.addParticles(
               b.x,
               b.y,
-              isCrit ? '#ff4757' : hasIntactArmor ? '#dfe4ea' : '#fffa65',
+              b.shape === 'saw'
+                ? '#ffa502'
+                : b.shape === 'star'
+                ? '#ff9f1a'
+                : isCrit
+                ? '#ff4757'
+                : hasIntactArmor
+                ? '#dfe4ea'
+                : '#fffa65',
               isCrit ? 6 : 3,
               110
             );
   
             this.applyDamageToRock(r, scaledDmg, engine, { isCrit });
   
-            // Area Splash Damage (Explosive Rounds Power-Up or Siege Blast Cannon)
+            // Area Splash Damage + Cluster Shrapnel (Blast Shells Power-Up or Siege Blast Cannon)
             if (b.splashRadius > 0) {
-              engine.addShockwave(b.x, b.y, b.splashRadius, 'rgba(255, 118, 117, 0.75)');
+              engine.addShockwave(b.x, b.y, b.splashRadius, 'rgba(255, 71, 87, 0.85)');
+              engine.addParticles(b.x, b.y, '#ff4757', 10, 190);
               const splashDmg = Math.max(1, Math.round(scaledDmg * 0.5));
               for (let k = rocks.length - 1; k >= 0; k--) {
                 const other = rocks[k];
@@ -2005,6 +2128,33 @@
                 const d = Math.hypot(other.x - b.x, other.y - b.y);
                 if (d <= b.splashRadius + other.radius) {
                   this.applyDamageToRock(other, splashDmg, engine, { isCrit: false });
+                }
+              }
+  
+              // Spawn 3 Cluster Shrapnel bolts if triggered by Blast Shells power-up
+              if (b.spawnClusters) {
+                for (const cAngle of [-0.55, 0, 0.55]) {
+                  bullets.push(
+                    bulletPool.acquire({
+                      x: b.x,
+                      y: b.y - 6,
+                      vx: Math.sin(cAngle) * 520,
+                      vy: -Math.cos(cAngle) * 520,
+                      radius: 4.5,
+                      shape: 'shrapnel',
+                      spinAngle: 0,
+                      bouncesLeft: 0,
+                      overdrive: false,
+                      isGiant: false,
+                      isPierce: false,
+                      pierceLeft: 0,
+                      splashRadius: 0,
+                      spawnClusters: false,
+                      lastHitRock: r,
+                      isDrone: false,
+                      damageRatio: 0.45,
+                    })
+                  );
                 }
               }
             }
@@ -2190,11 +2340,12 @@
       this.shakeTimer = 0;
       this.shakeIntensity = 0;
   
-      // Combo & Ultimate Skill State
+      // Combo & Fatal Slow-Mo State
       this.comboCount = 0;
       this.comboTimer = 0;
       this.ultimateCharge = 0;
       this.ultimateBeamTimer = 0;
+      this.deathSlowMoTimer = 0;
   
       this.activePowerups = {
         rapidFire: 0,
@@ -2219,6 +2370,7 @@
       this.powerups = [];
       this.particles = [];
       this.shockwaves = [];
+      this.laserBeams = [];
       this.floatingTexts = [];
   
       // Object Pools for high-frequency objects
@@ -2311,15 +2463,21 @@
       return true;
     }
   
-    addUltimateCharge(amount) {
-      const prev = this.ultimateCharge;
-      this.ultimateCharge = Math.min(100, this.ultimateCharge + amount);
-      if (this.ultimateCharge !== prev) {
-        this.bus.emit('ultimate:updated', this.ultimateCharge);
-      }
-      if (this.ultimateCharge >= 100 && this.gameState === 'PLAYING' && this.rocks.length > 0) {
-        this.activateUltimate();
-      }
+    selectWave(delta) {
+      if (this.gameState !== 'LOBBY') return false;
+      const save = this.saveManager.state;
+      const maxWave = Math.max(1, save.stats.highestWave || save.wave);
+      const nextWave = Math.max(1, Math.min(maxWave, save.wave + delta));
+      if (nextWave === save.wave) return false;
+      save.wave = nextWave;
+      this.saveManager.persist();
+      this.setupCurrentWave();
+      this.bus.emit('run:lobby');
+      return true;
+    }
+  
+    addUltimateCharge() {
+      // Repetitive auto-Supernova removed so power-ups shine individually
     }
   
     activateUltimate() {
@@ -2547,15 +2705,26 @@
       this.bus.emit('run:lobby');
     }
   
-    triggerGameOver() {
-      if (this.gameState === 'GAMEOVER') return;
-      this.gameState = 'GAMEOVER';
+    triggerGameOver(fatalRock = null) {
+      if (this.gameState === 'GAMEOVER' || this.gameState === 'DYING') return;
+      this.gameState = 'DYING';
+      this.deathSlowMoTimer = 0.38;
       this.comboCount = 0;
       this.comboTimer = 0;
       this.bus.emit('combo:updated', { count: 0, multiplier: 1 });
-      this.triggerShake(14, 0.35);
-      this.addParticles(this.cannon.x, this.cannon.y - 18, '#38b6ff', 28, 280);
+      this.triggerShake(16, 0.38);
+      this.addShockwave(this.cannon.x, this.cannon.y - 24, 115, '#ff4757');
+      this.addParticles(this.cannon.x, this.cannon.y - 18, '#ff4757', 24, 260);
+      this.addParticles(this.cannon.x, this.cannon.y - 18, '#38b6ff', 18, 220);
+      if (fatalRock) {
+        fatalRock.hitFlash = 0.8;
+        fatalRock.hitScale = 1.25;
+      }
+    }
   
+    finalizeGameOver() {
+      if (this.gameState === 'GAMEOVER') return;
+      this.gameState = 'GAMEOVER';
       this.bus.emit('run:gameover', {
         wave: this.saveManager.state.wave,
         score: this.score,
@@ -2566,6 +2735,7 @@
   
     reviveRun() {
       this.usedRevive = true;
+      this.deathSlowMoTimer = 0;
       this.invulnerableTimer = PHYSICS.REVIVE_SHIELD_DURATION;
       this.gameState = 'PLAYING';
   
@@ -2601,6 +2771,7 @@
       this.powerups = [];
       this.particles = [];
       this.shockwaves = [];
+      this.laserBeams = [];
       this.floatingTexts = [];
   
       this.setupCurrentWave();
@@ -2626,6 +2797,15 @@
       }
   
       if (this.gameState === 'PAUSED' || isModalOpen) {
+        return;
+      }
+  
+      if (this.gameState === 'DYING') {
+        this.deathSlowMoTimer -= dt;
+        this.physicsSystem.updateVFX(dt * 0.4, this);
+        if (this.deathSlowMoTimer <= 0) {
+          this.finalizeGameOver();
+        }
         return;
       }
   
@@ -2804,12 +2984,23 @@
       // Power-up Orbs
       this.drawPowerups(engine.powerups);
   
-      // Bullets
+      // Bullets & Distinct Power-Up Projectiles
       this.drawBullets(engine.bullets, skin);
   
-      // Orbital Ultimate Beam
-      if (engine.ultimateBeamTimer > 0) {
-        this.drawUltimateBeam(engine);
+      // Pierce Beam Laser Lances
+      if (engine.laserBeams && engine.laserBeams.length > 0) {
+        this.drawLaserBeams(engine.laserBeams);
+      }
+  
+      // Incoming Boulder Spawn Lane Warning Indicator
+      if (engine.gameState === 'PLAYING') {
+        const warning = engine.waveSystem.getPendingWarning(
+          engine.rocks,
+          engine.saveManager.state.wave
+        );
+        if (warning) {
+          this.drawSpawnWarning(warning, width, time);
+        }
       }
   
       // Rocks
@@ -2820,7 +3011,7 @@
       // Cannon & Wingman Drones
       this.drawCannon(skin);
   
-      // Ground
+      // Ground & Underground Thumb Trackpad Zone
       this.drawGround(theme, width, height, groundY);
   
       // Particles
@@ -2876,7 +3067,7 @@
     }
   
     drawGround(theme, width, height, groundY) {
-      const { ctx } = this;
+      const { ctx, engine } = this;
       ctx.fillStyle = theme.grassTop;
       ctx.fillRect(0, groundY, width, 8);
       ctx.fillStyle = theme.grassSub;
@@ -2887,6 +3078,36 @@
       earthGrad.addColorStop(1, theme.earthBot);
       ctx.fillStyle = earthGrad;
       ctx.fillRect(0, groundY + 13, width, height - groundY - 13);
+  
+      // Underground Ergonomic Thumb Trackpad Zone (shown during active gameplay so thumb never blocks cannon)
+      if (engine.gameState === 'PLAYING') {
+        const trackY = groundY + (height - groundY) * 0.56;
+        const trackLeft = 36;
+        const trackRight = width - 36;
+        const trackW = Math.max(80, trackRight - trackLeft);
+  
+        ctx.save();
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
+        ctx.beginPath();
+        ctx.roundRect(trackLeft, trackY - 3, trackW, 6, 3);
+        ctx.fill();
+  
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.32)';
+        ctx.font = '800 9px -apple-system, BlinkMacSystemFont, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('◀ DRAG THUMB HERE ▶', width / 2, trackY + 18);
+  
+        // Glowing thumb position indicator synced with cannon.x
+        const puckX = Math.max(trackLeft, Math.min(trackRight, engine.cannon.x));
+        ctx.beginPath();
+        ctx.arc(puckX, trackY, 8, 0, Math.PI * 2);
+        ctx.fillStyle = '#38b6ff';
+        ctx.fill();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = '#ffffff';
+        ctx.stroke();
+        ctx.restore();
+      }
     }
   
     drawCoins(coins) {
@@ -2979,53 +3200,135 @@
           continue;
         }
   
-        const grad = ctx.createLinearGradient(b.x, b.y - 12, b.x, b.y + 12);
-        if (b.isPierce) {
-          grad.addColorStop(0, '#ffffff');
-          grad.addColorStop(0.4, '#d980fa');
-          grad.addColorStop(1, '#8e44ad');
-        } else if (b.splashRadius > 0) {
-          grad.addColorStop(0, '#ffffff');
-          grad.addColorStop(0.4, '#ff7979');
-          grad.addColorStop(1, '#eb2f06');
-        } else if (b.overdrive) {
-          grad.addColorStop(0, '#ffffff');
-          grad.addColorStop(0.4, '#48dbfb');
-          grad.addColorStop(1, '#0abde3');
-        } else {
-          grad.addColorStop(0, skin.bulletTop);
-          grad.addColorStop(0.4, skin.bulletMid);
-          grad.addColorStop(1, skin.bulletBot);
+        // 1. Saw Calibre: Spinning serrated fiery sawblade disc
+        if (b.shape === 'saw') {
+          ctx.translate(b.x, b.y);
+          ctx.rotate(b.spinAngle || 0);
+          ctx.beginPath();
+          ctx.arc(0, 0, b.radius, 0, Math.PI * 2);
+          ctx.fillStyle = '#ff9f1a';
+          ctx.fill();
+          ctx.lineWidth = 3;
+          ctx.strokeStyle = '#ff3838';
+          ctx.setLineDash([4, 3]);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.beginPath();
+          ctx.arc(0, 0, 4, 0, Math.PI * 2);
+          ctx.fillStyle = '#ffffff';
+          ctx.fill();
+          ctx.restore();
+          continue;
         }
+  
+        // 2. Ricochet Fan: Spinning 4-point star blade
+        if (b.shape === 'star') {
+          ctx.translate(b.x, b.y);
+          ctx.rotate(b.spinAngle || 0);
+          ctx.fillStyle = '#ff9f1a';
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          for (let p = 0; p < 8; p++) {
+            const rad = p % 2 === 0 ? b.radius * 1.35 : b.radius * 0.45;
+            const ang = (p * Math.PI) / 4;
+            if (p === 0) ctx.moveTo(Math.cos(ang) * rad, Math.sin(ang) * rad);
+            else ctx.lineTo(Math.cos(ang) * rad, Math.sin(ang) * rad);
+          }
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+          ctx.restore();
+          continue;
+        }
+  
+        // 3. Blast Shells: Heavy cluster mortar bomb or shrapnel spark
+        if (b.shape === 'bomb' || b.shape === 'shrapnel') {
+          ctx.translate(b.x, b.y);
+          ctx.beginPath();
+          ctx.arc(0, 0, b.radius * 1.15, 0, Math.PI * 2);
+          ctx.fillStyle = b.shape === 'bomb' ? '#eb2f06' : '#ff9f1a';
+          ctx.fill();
+          ctx.lineWidth = 2;
+          ctx.strokeStyle = '#fffa65';
+          ctx.stroke();
+          ctx.restore();
+          continue;
+        }
+  
+        // 4. Overdrive: Twin electric cyan hyper-tracer needle
+        if (b.shape === 'needle') {
+          ctx.fillStyle = '#48dbfb';
+          ctx.beginPath();
+          ctx.roundRect(b.x - 2.5, b.y - 14, 5, 28, 2.5);
+          ctx.fill();
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(b.x - 1, b.y - 12, 2, 20);
+          ctx.restore();
+          continue;
+        }
+  
+        // Standard Cannon Bullet
+        const grad = ctx.createLinearGradient(b.x, b.y - 12, b.x, b.y + 12);
+        grad.addColorStop(0, skin.bulletTop);
+        grad.addColorStop(0.4, skin.bulletMid);
+        grad.addColorStop(1, skin.bulletBot);
         ctx.fillStyle = grad;
-        const bw = b.isGiant ? 14 : 8;
-        const bh = b.isGiant ? 26 : b.isPierce ? 24 : 18;
         ctx.beginPath();
-        ctx.roundRect(b.x - bw / 2, b.y - bh / 2, bw, bh, bw / 2);
+        ctx.roundRect(b.x - 4, b.y - 9, 8, 18, 4);
         ctx.fill();
         ctx.restore();
       }
     }
   
-    drawUltimateBeam(engine) {
+    drawLaserBeams(laserBeams) {
       const { ctx } = this;
-      const { cannon, ultimateBeamTimer } = engine;
-      const alpha = Math.min(1, ultimateBeamTimer * 1.4);
+      for (const beam of laserBeams) {
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, Math.min(1, beam.life));
+  
+        // Outer magenta glow
+        const w = beam.width * 2.2;
+        const grad = ctx.createLinearGradient(beam.x - w / 2, 0, beam.x + w / 2, 0);
+        grad.addColorStop(0, 'rgba(217, 128, 250, 0)');
+        grad.addColorStop(0.3, 'rgba(217, 128, 250, 0.65)');
+        grad.addColorStop(0.5, '#ffffff');
+        grad.addColorStop(0.7, 'rgba(217, 128, 250, 0.65)');
+        grad.addColorStop(1, 'rgba(217, 128, 250, 0)');
+  
+        ctx.fillStyle = grad;
+        ctx.fillRect(beam.x - w / 2, 0, w, beam.y);
+  
+        // Core white laser line
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(beam.x - 2, 0, 4, beam.y);
+        ctx.restore();
+      }
+    }
+  
+    drawSpawnWarning(warning, width, time) {
+      const { ctx } = this;
+      const pulse = 0.55 + 0.45 * Math.sin(time * 0.02);
+      const x = warning.fromLeft ? 22 : width - 22;
+      const y = warning.y;
+      const color = warning.isBoss ? '#ff4757' : warning.variant === 'fast' ? '#ff9f1a' : '#ffcf33';
   
       ctx.save();
-      ctx.globalAlpha = alpha;
+      ctx.globalAlpha = pulse;
+      ctx.fillStyle = 'rgba(10, 14, 28, 0.85)';
+      ctx.beginPath();
+      ctx.arc(x, y, 14, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = color;
+      ctx.stroke();
   
-      // Wide outer plasma pillar
-      const beamGrad = ctx.createLinearGradient(cannon.x - 45, 0, cannon.x + 45, 0);
-      beamGrad.addColorStop(0, 'rgba(72, 219, 251, 0)');
-      beamGrad.addColorStop(0.25, 'rgba(72, 219, 251, 0.55)');
-      beamGrad.addColorStop(0.5, 'rgba(255, 255, 255, 0.95)');
-      beamGrad.addColorStop(0.75, 'rgba(72, 219, 251, 0.55)');
-      beamGrad.addColorStop(1, 'rgba(72, 219, 251, 0)');
-  
-      ctx.fillStyle = beamGrad;
-      ctx.fillRect(cannon.x - 45, 0, 90, cannon.y - 36);
-  
+      ctx.fillStyle = color;
+      ctx.font = '900 11px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      const badge = warning.isBoss ? '👑' : warning.variant === 'fast' ? '☄️' : warning.fromLeft ? '▶' : '◀';
+      ctx.fillText(badge, x, y + 0.5);
       ctx.restore();
     }
   
@@ -3175,6 +3478,20 @@
           ? `rgba(46, 213, 115, ${0.85 * pulse})`
           : `rgba(72, 219, 251, ${0.8 * pulse})`;
         ctx.stroke();
+      }
+  
+      // Magnet Vortex rotating golden gravity ring
+      if (activePowerups.magnet > 0) {
+        ctx.save();
+        ctx.translate(0, -22);
+        ctx.rotate(performance.now() * 0.004);
+        ctx.beginPath();
+        ctx.arc(0, 0, 48, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(255, 207, 51, 0.78)';
+        ctx.lineWidth = 2.5;
+        ctx.setLineDash([8, 6]);
+        ctx.stroke();
+        ctx.restore();
       }
   
       if (cannon.muzzleFlash > 0) {
@@ -3720,11 +4037,16 @@
       this.powerupHudEl = document.getElementById('powerup-hud');
       this.achToastEl = document.getElementById('achievement-toast');
       this.achToastIconEl = document.getElementById('ach-toast-icon');
+      this.achToastLabelEl = document.getElementById('ach-toast-label');
       this.achToastTitleEl = document.getElementById('ach-toast-title');
+      this.hangarNotifDotEl = document.getElementById('hangar-notif-dot');
       this.startPromptEl = document.getElementById('start-prompt');
       this.startPromptWaveEl = document.getElementById('start-prompt-wave');
+      this.wavePrevBtn = document.getElementById('wave-prev-btn');
+      this.waveNextBtn = document.getElementById('wave-next-btn');
       this.startPromptTextEl = document.getElementById('start-prompt-text');
       this.lobbyModeWrapEl = document.getElementById('lobby-mode-wrap');
+      this.lobbyLoadoutBtn = document.getElementById('lobby-loadout-btn');
       this.upgradePanelEl = document.getElementById('upgrade-panel');
       this.pauseBtn = document.getElementById('pause-btn');
       this.waveBannerEl = document.getElementById('wave-banner');
@@ -3788,6 +4110,21 @@
         this.showAchievementToast(ach);
       });
   
+      this.bus.on('gear:unlocked', (gear) => {
+        this.updateHUD();
+        this.showGearToast(gear);
+      });
+  
+      this.wavePrevBtn?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.engine.selectWave(-1);
+      });
+  
+      this.waveNextBtn?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.engine.selectWave(1);
+      });
+  
       this.bus.on('run:started', () => {
         this.startPromptEl.classList.add('hidden');
         this.lobbyModeWrapEl?.classList.add('hidden');
@@ -3825,6 +4162,21 @@
           ? `👑 BOSS RUSH • WAVE ${save.wave}`
           : `WAVE ${save.wave}`;
         this.startPromptWaveEl.classList.toggle('boss-rush', isBossRush);
+      }
+      if (this.wavePrevBtn) {
+        this.wavePrevBtn.classList.toggle('hidden', save.wave <= 1);
+      }
+      if (this.waveNextBtn) {
+        const maxWave = Math.max(1, save.stats.highestWave || save.wave);
+        this.waveNextBtn.classList.toggle('hidden', save.wave >= maxWave);
+      }
+      if (this.lobbyLoadoutBtn) {
+        const c = this.engine.saveManager.getActiveCannon();
+        const a = this.engine.saveManager.getActiveAddon();
+        this.lobbyLoadoutBtn.textContent = `${c.icon} ${c.name} • ${a.icon} ${a.name}`;
+      }
+      if (this.hangarNotifDotEl) {
+        this.hangarNotifDotEl.classList.toggle('hidden', !save.hasUnseenGear);
       }
       if (this.startPromptTextEl) {
         this.startPromptTextEl.textContent = 'DRAG TO AIM & FIRE';
@@ -3885,6 +4237,7 @@
     }
   
     showAchievementToast(ach) {
+      if (this.achToastLabelEl) this.achToastLabelEl.textContent = 'ACHIEVEMENT UNLOCKED!';
       this.achToastIconEl.textContent = ach.icon;
       this.achToastTitleEl.textContent = `${ach.name} (+${ach.reward} 🪙)`;
       this.achToastEl.classList.remove('hidden');
@@ -3892,6 +4245,17 @@
       this.toastTimeout = setTimeout(() => {
         this.achToastEl.classList.add('hidden');
       }, 3200);
+    }
+  
+    showGearToast({ category, name, icon }) {
+      if (this.achToastLabelEl) this.achToastLabelEl.textContent = `🔓 NEW ${category} UNLOCKED!`;
+      this.achToastIconEl.textContent = icon || '🎨';
+      this.achToastTitleEl.textContent = `${name} (Tap 🎨 Hangar)`;
+      this.achToastEl.classList.remove('hidden');
+      if (this.toastTimeout) clearTimeout(this.toastTimeout);
+      this.toastTimeout = setTimeout(() => {
+        this.achToastEl.classList.add('hidden');
+      }, 3400);
     }
   }
 
@@ -3936,6 +4300,7 @@
       this.statsBtn = document.getElementById('stats-btn');
       this.settingsBtn = document.getElementById('settings-btn');
       this.modeToggleBtn = document.getElementById('mode-toggle-btn');
+      this.lobbyLoadoutBtn = document.getElementById('lobby-loadout-btn');
       this.openSkinsFooterBtn = document.getElementById('open-skins-footer-btn');
       this.openStatsFooterBtn = document.getElementById('open-stats-footer-btn');
       this.openDisclaimerBtn = document.getElementById('open-disclaimer-btn');
@@ -4000,19 +4365,47 @@
         this.gameoverModalEl.classList.add('hidden');
       });
   
-      // Upgrade Card Clicks
+      // Upgrade Card Clicks & Press-and-Hold Auto-Upgrade
+      let holdTimeout = null;
+      let holdInterval = null;
+      const stopHoldUpgrade = () => {
+        if (holdTimeout) clearTimeout(holdTimeout);
+        if (holdInterval) clearInterval(holdInterval);
+        holdTimeout = null;
+        holdInterval = null;
+      };
+  
       document.querySelectorAll('.upgrade-card').forEach((btn) => {
+        const type = btn.getAttribute('data-upgrade');
         btn.addEventListener('click', (e) => {
           e.stopPropagation();
           this.audioService.init();
-          const type = btn.getAttribute('data-upgrade');
           this.engine.buyUpgrade(type);
         });
+        btn.addEventListener('pointerdown', (e) => {
+          e.stopPropagation();
+          stopHoldUpgrade();
+          holdTimeout = setTimeout(() => {
+            holdInterval = setInterval(() => {
+              if (!this.engine.buyUpgrade(type)) {
+                stopHoldUpgrade();
+              }
+            }, 110);
+          }, 340);
+        });
+        btn.addEventListener('pointerup', stopHoldUpgrade);
+        btn.addEventListener('pointerleave', stopHoldUpgrade);
+        btn.addEventListener('pointercancel', stopHoldUpgrade);
       });
   
       // Modal Open Buttons
       const openSkins = () => {
         this.audioService.init();
+        if (this.engine.saveManager.state.hasUnseenGear) {
+          this.engine.saveManager.state.hasUnseenGear = false;
+          this.engine.saveManager.persist();
+          this.bus.emit('state:updated', this.engine.saveManager.state);
+        }
         this.renderSkinsModal();
         this.skinsModalEl.classList.remove('hidden');
       };
@@ -4035,6 +4428,7 @@
       };
   
       this.skinsBtn.addEventListener('click', openSkins);
+      this.lobbyLoadoutBtn?.addEventListener('click', openSkins);
       this.openSkinsFooterBtn?.addEventListener('click', openSkins);
       this.statsBtn.addEventListener('click', openStats);
       this.openStatsFooterBtn?.addEventListener('click', openStats);
@@ -4231,6 +4625,7 @@
             this.engine.saveManager.persist();
             this.audioService.playUpgrade();
             this.updateUpgradeButtons();
+            this.bus.emit('state:updated', save);
             this.renderSkinsModal();
           };
         });
@@ -4262,6 +4657,7 @@
             save.equipped.addon = id;
             this.engine.saveManager.persist();
             this.audioService.playUpgrade();
+            this.bus.emit('state:updated', save);
             this.renderSkinsModal();
           };
         });

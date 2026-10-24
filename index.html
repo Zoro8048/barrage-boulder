@@ -38,6 +38,7 @@
             </button>
             <button id="skins-btn" class="icon-btn" title="Hangar, Loadout &amp; Power-Up Guide" aria-label="Hangar and Loadout">
               🎨
+              <span id="hangar-notif-dot" class="notif-dot hidden"></span>
             </button>
             <button id="stats-btn" class="icon-btn" title="Stats &amp; Achievements" aria-label="Stats and Achievements">
               🏆
@@ -67,22 +68,29 @@
             <button type="button" id="mode-toggle-btn" class="mode-chip-btn">
               🌊 Mode: Standard
             </button>
+            <button type="button" id="lobby-loadout-btn" class="mode-chip-btn loadout-chip-btn" title="Open Hangar Loadout">
+              🔫 Vulcan Striker • 🛸 Drones
+            </button>
           </div>
         </div>
       </header>
 
-      <!-- Achievement Toast Notification -->
+      <!-- Achievement & Gear Unlock Toast Notification -->
       <div id="achievement-toast" class="achievement-toast hidden">
         <span class="ach-toast-icon" id="ach-toast-icon">🏆</span>
         <div class="ach-toast-body">
-          <div class="ach-toast-label">ACHIEVEMENT UNLOCKED!</div>
+          <div class="ach-toast-label" id="ach-toast-label">ACHIEVEMENT UNLOCKED!</div>
           <div class="ach-toast-title" id="ach-toast-title">Boulder Crusher</div>
         </div>
       </div>
 
       <!-- Drag to Start Prompt (shown in lobby before dragging) -->
       <div id="start-prompt" class="visible">
-        <div id="start-prompt-wave" class="start-wave-pill">WAVE 1</div>
+        <div class="wave-stepper-row">
+          <button type="button" id="wave-prev-btn" class="wave-step-btn hidden" title="Replay Previous Wave" aria-label="Previous Wave">◀</button>
+          <div id="start-prompt-wave" class="start-wave-pill">WAVE 1</div>
+          <button type="button" id="wave-next-btn" class="wave-step-btn hidden" title="Advance to Next Unlocked Wave" aria-label="Next Wave">▶</button>
+        </div>
         <div class="hand-slider">
           <span class="arrow">◀</span>
           <span class="hand-icon">👆</span>
