@@ -1,6 +1,7 @@
 /**
  * WaveSystem - Generates wave rock queues, calculates total wave HP (including child splits),
- * and schedules rock spawns for both Standard and Boss Rush modes.
+ * calibrates boulder health and sizes based on player firepower and progression,
+ * and schedules viewport-aware rock spawns for both Standard and Boss Rush modes.
  */
 
 import { ROCK_RADII } from '../config/constants.js';
@@ -33,17 +34,55 @@ export function calculateWaveTotalHP(rockQueue) {
   }, 0);
 }
 
-export function getWaveBaseHP(waveNum) {
-  // Smooth piecewise exponential curve so Wave 25-50+ doesn't outscale player DPS
+/**
+ * Expected baseline DPS of a player at waveNum under normal progression.
+ */
+export function getExpectedWaveDPS(waveNum) {
+  if (waveNum <= 10) return 50 + waveNum * 45;
+  if (waveNum <= 25) return 500 + (waveNum - 10) * 350;
+  if (waveNum <= 50) return 5750 + (waveNum - 25) * 370;
+  return 15000 + (waveNum - 50) * 350;
+}
+
+export function getWaveBaseHP(waveNum, playerDPS = null) {
+  // Smooth piecewise curve calibrated with upgrade economy so higher waves
+  // (like Wave 50-70+) remain challenging without outscaling player DPS into an impossible wall.
+  let baseHP;
   if (waveNum <= 12) {
-    return Math.max(2, Math.round(4 * Math.pow(1.3, waveNum - 1)));
+    baseHP = Math.max(2, Math.round(4 * Math.pow(1.3, waveNum - 1)));
+  } else if (waveNum <= 25) {
+    const hpAt12 = 4 * Math.pow(1.3, 11);
+    baseHP = Math.round(hpAt12 * Math.pow(1.19, waveNum - 12));
+  } else if (waveNum <= 50) {
+    const hpAt12 = 4 * Math.pow(1.3, 11);
+    const hpAt25 = hpAt12 * Math.pow(1.19, 13);
+    baseHP = Math.round(hpAt25 * Math.pow(1.042, waveNum - 25));
+  } else {
+    const hpAt12 = 4 * Math.pow(1.3, 11);
+    const hpAt25 = hpAt12 * Math.pow(1.19, 13);
+    const hpAt50 = hpAt25 * Math.pow(1.042, 25);
+    baseHP = Math.round(hpAt50 * Math.pow(1.022, waveNum - 50));
   }
-  const hpAt12 = 4 * Math.pow(1.3, 11);
-  if (waveNum <= 25) {
-    return Math.round(hpAt12 * Math.pow(1.19, waveNum - 12));
+
+  // If existing player firepower (DPS) is provided, calibrate boulder HP so it is doable
+  // with existing firepower, while enforcing a difficulty floor so players with very little
+  // firepower cannot finish all the levels without upgrading.
+  if (playerDPS && playerDPS > 0) {
+    const expectedDPS = getExpectedWaveDPS(waveNum);
+    const firepowerRatio = Math.max(0.1, playerDPS / expectedDPS);
+
+    // Maximum base HP that is comfortably doable in ~2.5 - 3.5 seconds of sustained fire
+    // for a large rock (size 3 total split multiplier is ~3 * 2.2 = 6.6)
+    const maxDoableBaseHP = Math.round((playerDPS * 2.8) / (2.2 * 3));
+
+    // High waves enforce a minimum difficulty floor proportional to the wave's expected firepower.
+    // This prevents finishing all levels with very little firepower.
+    const minWaveFloor = Math.round(baseHP * Math.min(1.0, Math.max(0.55, firepowerRatio)));
+
+    baseHP = Math.max(minWaveFloor, Math.min(baseHP, maxDoableBaseHP));
   }
-  const hpAt25 = hpAt12 * Math.pow(1.19, 13);
-  return Math.round(hpAt25 * Math.pow(1.12, waveNum - 25));
+
+  return Math.max(2, baseHP);
 }
 
 export class WaveSystem {
@@ -53,16 +92,50 @@ export class WaveSystem {
     this.waveTotalHP = 100;
     this.waveDamageDealt = 0;
     this.spawnTimer = 0.4;
+    this.viewportWidth = 400;
   }
 
-  setupWave(waveNum, isPlaying = false, rng = Math.random, isBossRush = false) {
+  getViewportLimits(width = 400) {
+    const w = width || this.viewportWidth || 400;
+    // Maximum combined horizontal footprint (sum of rock diameters)
+    // leaving at least 48% clear corridor for the cannon (52px wide) to dodge safely
+    const maxActiveFootprint = Math.max(160, Math.round(w * 0.52));
+    // Maximum concurrent boulders that can cleanly fit in the viewport
+    const maxActiveCount = Math.max(2, Math.min(5, Math.floor(w / 85)));
+    return { maxActiveFootprint, maxActiveCount, width: w };
+  }
+
+  canSpawnInViewport(activeRocks, width = 400) {
+    if (activeRocks.length === 0) return true;
+    const { maxActiveFootprint, maxActiveCount, width: w } = this.getViewportLimits(width);
+    if (activeRocks.length >= maxActiveCount) return false;
+
+    const activeFootprint = activeRocks.reduce(
+      (sum, r) => sum + (r.radius ? r.radius * 2 : (ROCK_RADII[r.size] || 38) * 2),
+      0
+    );
+    if (activeFootprint >= maxActiveFootprint) return false;
+
+    // If next rock would exceed comfortable corridor space, hold back
+    if (this.waveRocksToSpawn.length > 0) {
+      const nextSize = this.waveRocksToSpawn[0].size;
+      const nextDiam = (ROCK_RADII[nextSize] || 38) * 2;
+      if (activeFootprint + nextDiam > w * 0.72) return false;
+    }
+
+    return true;
+  }
+
+  setupWave(waveNum, isPlaying = false, rng = Math.random, isBossRush = false, options = {}) {
     this.waveRocksToSpawn = [];
     this.waveDamageDealt = 0;
+    if (options.viewportWidth) this.viewportWidth = options.viewportWidth;
 
     const isMilestoneWave = waveNum % 10 === 0 || (isBossRush && waveNum % 3 === 0);
     const isBossWave = isBossRush || waveNum % 3 === 0 || isMilestoneWave;
 
-    const baseHP = getWaveBaseHP(waveNum);
+    const playerDPS = options.playerDPS || null;
+    const baseHP = getWaveBaseHP(waveNum, playerDPS);
 
     if (isBossRush) {
       // Boss Rush Mode: 2 to 3 high-intensity Boss & Escort boulders per wave
@@ -86,9 +159,10 @@ export class WaveSystem {
         });
       }
     } else {
+      // Viewport-aware total rock count so waves do not flood the screen with endless splitting sponges
       const rockCount = isMilestoneWave
-        ? 3 + Math.min(4, Math.floor(waveNum * 0.4))
-        : 4 + Math.min(8, Math.floor(waveNum * 0.85));
+        ? 3 + Math.min(2, Math.floor(waveNum * 0.05))
+        : 4 + Math.min(4, Math.floor(waveNum * 0.08));
 
       for (let i = 0; i < rockCount; i++) {
         const isFinalRock = i === rockCount - 1;
@@ -99,9 +173,9 @@ export class WaveSystem {
           size = 3;
         } else if (isFinalRock && waveNum >= 2) {
           size = 3;
-        } else if (rng() < 0.35) {
+        } else if (rng() < 0.38) {
           size = 1;
-        } else if (waveNum >= 3 && rng() < 0.3) {
+        } else if (waveNum >= 3 && rng() < 0.28) {
           size = 3;
         }
 
@@ -148,31 +222,42 @@ export class WaveSystem {
 
   update(dt, waveNum, activeRocks, width) {
     if (this.waveRocksToSpawn.length === 0) return;
+    if (width) this.viewportWidth = width;
+
+    // Viewport-aware check: do not spawn new incoming boulders if the viewport is saturated
+    const canSpawn = this.canSpawnInViewport(activeRocks, width);
+
+    if (!canSpawn) {
+      // Hold back incoming spawn and maintain a safe buffer so the player gets space to dodge and clear rocks
+      this.spawnTimer = Math.max(this.spawnTimer, 0.75);
+      return;
+    }
 
     this.spawnTimer -= dt;
-    // Weight active rocks by size so a screen full of splitting boulders doesn't get flooded
-    const activeWeight = activeRocks.reduce(
-      (sum, r) => sum + (r.size === 3 ? 2.0 : r.size === 2 ? 1.35 : 0.85),
-      0
-    );
-    const maxWeight = 4.2 + Math.min(2.5, Math.floor(waveNum / 6) * 0.5);
 
-    if (this.spawnTimer <= 0 && (activeRocks.length === 0 || activeWeight < maxWeight)) {
-      this.spawnNextRock(activeRocks, width);
-      // Stagger spawns further apart when multiple rocks are already active on screen
-      const crowdDelay = activeRocks.length * 0.55;
-      this.spawnTimer = Math.max(1.8, 2.5 - Math.min(0.8, waveNum * 0.03) + crowdDelay);
+    if (this.spawnTimer <= 0) {
+      this.spawnNextRock(activeRocks, width || this.viewportWidth);
+
+      // Stagger next incoming boulder based on current viewport occupancy
+      const limits = this.getViewportLimits(width);
+      const currentFootprint = activeRocks.reduce(
+        (sum, r) => sum + (r.radius ? r.radius * 2 : (ROCK_RADII[r.size] || 38) * 2),
+        0
+      );
+      const occupancyRatio = Math.min(1, currentFootprint / limits.maxActiveFootprint);
+      const countRatio = Math.min(1, activeRocks.length / limits.maxActiveCount);
+      const pressure = Math.max(occupancyRatio, countRatio);
+
+      // Dynamic pacing: ~1.8s when clear, up to ~4.2s when crowded
+      this.spawnTimer = 1.8 + pressure * 2.2;
     }
   }
 
-  getPendingWarning(activeRocks, waveNum) {
+  getPendingWarning(activeRocks, waveNum, width) {
     if (this.waveRocksToSpawn.length === 0 || this.spawnTimer > 0.65) return null;
-    const activeWeight = activeRocks.reduce(
-      (sum, r) => sum + (r.size === 3 ? 2.0 : r.size === 2 ? 1.35 : 0.85),
-      0
-    );
-    const maxWeight = 4.2 + Math.min(2.5, Math.floor(waveNum / 6) * 0.5);
-    if (activeRocks.length > 0 && activeWeight >= maxWeight) return null;
+    const effectiveWidth = width || this.viewportWidth || 400;
+    if (!this.canSpawnInViewport(activeRocks, effectiveWidth)) return null;
+
     const next = this.waveRocksToSpawn[0];
     return {
       fromLeft: next.fromLeft ?? true,
@@ -189,7 +274,8 @@ export class WaveSystem {
     const spec = this.waveRocksToSpawn.shift();
     const fromLeft = spec.fromLeft !== undefined ? spec.fromLeft : Math.random() < 0.5;
     const radius = ROCK_RADII[spec.size] || 38;
-    const x = fromLeft ? -radius * 0.5 : width + radius * 0.5;
+    const effWidth = width || this.viewportWidth || 400;
+    const x = fromLeft ? -radius * 0.5 : effWidth + radius * 0.5;
     const y = 95 + (spec.spawnYRatio !== undefined ? spec.spawnYRatio : Math.random()) * 80;
     const baseSpeed = spec.variant === 'fast' ? 140 + Math.random() * 65 : 75 + Math.random() * 55;
     const speedX = (fromLeft ? 1 : -1) * baseSpeed;

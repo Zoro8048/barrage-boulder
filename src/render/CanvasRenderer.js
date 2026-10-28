@@ -108,7 +108,8 @@ export class CanvasRenderer {
     if (engine.gameState === 'PLAYING') {
       const warning = engine.waveSystem.getPendingWarning(
         engine.rocks,
-        engine.saveManager.state.wave
+        engine.saveManager.state.wave,
+        width
       );
       if (warning) {
         this.drawSpawnWarning(warning, width, time);

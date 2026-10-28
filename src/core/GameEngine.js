@@ -398,11 +398,23 @@ export class GameEngine {
       save.stats.highestWave = save.wave;
       this.saveManager.persist();
     }
+    const bulletDmg = this.getBulletDamage();
+    const baseBarrels = this.getBarrelCount();
+    const variety = this.saveManager.getActiveCannon();
+    const barrels = Math.max(1, baseBarrels + (variety.extraBarrels || 0));
+    const fireRate = this.getFireRateShotsPerSec();
+    const playerDPS = bulletDmg * barrels * fireRate;
+
     this.waveSystem.setupWave(
       save.wave,
       this.gameState === 'PLAYING',
       Math.random,
-      this.gameMode === 'BOSS_RUSH'
+      this.gameMode === 'BOSS_RUSH',
+      {
+        playerDPS,
+        viewportWidth: this.width,
+        viewportHeight: this.height,
+      }
     );
   }
 
