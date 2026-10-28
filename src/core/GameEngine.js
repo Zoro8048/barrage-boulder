@@ -5,6 +5,7 @@
 import { PHYSICS, COMBAT } from '../config/constants.js';
 import { POWERUP_META, POWERUP_DROP_CHANCE } from '../config/powerups.js';
 import { TACTICAL_AUGMENTS } from '../config/augments.js';
+import { getActiveSynergies } from '../config/synergies.js';
 import { ObjectPool } from './ObjectPool.js';
 import { formatNum } from './utils.js';
 import {
@@ -175,12 +176,26 @@ export class GameEngine {
     return this.saveManager.state.stats.highestWave >= 6;
   }
 
+  isEndlessUnlocked() {
+    return this.saveManager.state.stats.highestWave >= 10;
+  }
+
   toggleGameMode() {
     if (!this.isBossRushUnlocked()) return false;
-    this.gameMode = this.gameMode === 'STANDARD' ? 'BOSS_RUSH' : 'STANDARD';
+    if (this.gameMode === 'STANDARD') {
+      this.gameMode = 'BOSS_RUSH';
+    } else if (this.gameMode === 'BOSS_RUSH') {
+      this.gameMode = this.isEndlessUnlocked() ? 'ENDLESS' : 'STANDARD';
+    } else {
+      this.gameMode = 'STANDARD';
+    }
     this.setupCurrentWave();
     this.bus.emit('mode:changed', this.gameMode);
     return true;
+  }
+
+  triggerCannonAbility() {
+    return this.combatSystem.activateCannonAbility(this);
   }
 
   selectWave(delta) {
@@ -280,7 +295,10 @@ export class GameEngine {
   activatePowerup(type, x, y) {
     const meta = POWERUP_META[type];
     if (!meta) return;
-    const durBonus = this.saveManager.state.upgrades.offlineEarnings >= 20 ? 1.25 : 1.0;
+    const hasMastery = this.saveManager.hasTechPerk && this.saveManager.hasTechPerk('powerupMastery');
+    const durBonus =
+      (this.saveManager.state.upgrades.offlineEarnings >= 20 ? 1.25 : 1.0) *
+      (hasMastery ? 1.35 : 1.0);
     this.activePowerups[type] = meta.duration * durBonus;
     this.saveManager.state.stats.powerupsCollected += 1;
     this.bus.emit('powerup:collected', { type, meta });
@@ -288,10 +306,23 @@ export class GameEngine {
     this.addFloatingText(
       x,
       y - 18,
-      `${meta.icon} ${meta.label}: ${meta.hudDesc}!`,
+      `${meta.icon} ${meta.label}!`,
       meta.color,
       14
     );
+
+    // Overclock Synergy Activation Check
+    const synergies = getActiveSynergies(this.activePowerups);
+    for (const syn of synergies) {
+      if (syn.pair.includes(type)) {
+        this.triggerShake(7, 0.22);
+        this.addShockwave(x, y, 130, syn.color);
+        this.addFloatingText(x, y - 36, `⚡ OVERCLOCK: ${syn.name}! ⚡`, syn.color, 15);
+        this.bus.emit('synergy:activated', { synergy: syn });
+        break;
+      }
+    }
+
     this.achievementTracker.checkUnlockables();
     this.saveManager.persist();
     this.bus.emit('powerup:updated', this.activePowerups);
@@ -414,6 +445,7 @@ export class GameEngine {
         playerDPS,
         viewportWidth: this.width,
         viewportHeight: this.height,
+        isEndless: this.gameMode === 'ENDLESS',
       }
     );
   }
@@ -421,6 +453,9 @@ export class GameEngine {
   startRun() {
     if (this.gameState !== 'LOBBY' || this.intermissionLockTimer > 0) return;
     this.gameState = 'PLAYING';
+    if (this.gameMode === 'ENDLESS') {
+      this.endlessElapsed = 0;
+    }
     this.saveManager.state.stats.runsPlayed += 1;
     this.saveManager.persist();
     this.recalcMaxHull();
@@ -456,6 +491,12 @@ export class GameEngine {
       waveBonusScale * (isMilestone ? 2.5 : 1) * this.getCoinMultiplier()
     );
 
+    if (this.gameMode === 'ENDLESS') {
+      this.awardCoins(waveBonus);
+      this.bus.emit('endless:checkpoint', { elapsed: this.endlessElapsed });
+      return;
+    }
+
     // Auto-collect any remaining coins and power-ups on the field
     for (const c of this.coins) {
       this.awardCoins(c.value, c.x, c.y - 10);
@@ -479,6 +520,14 @@ export class GameEngine {
     // Full Hull repair between waves
     this.recalcMaxHull();
     this.hull = this.maxHull;
+
+    // Nanite Hull Splicer Perk: Repair 1 depleted hull point every 8 waves
+    if (this.saveManager.hasTechPerk && this.saveManager.hasTechPerk('naniteRepair') && clearedWave % 8 === 0) {
+      this.recalcMaxHull();
+      this.hull = Math.min(this.maxHull, this.hull + 1);
+      this.addFloatingText(this.cannon.x, this.cannon.y - 48, '🛡️ NANITE REPAIR!', '#2ed573', 15);
+    }
+
     this.bus.emit('hull:updated', { hull: this.hull, maxHull: this.maxHull });
 
     // Boss Wave Cleared (every 3 waves or in Boss Rush): Offer 3 Tactical Augments
@@ -687,6 +736,13 @@ export class GameEngine {
     }
 
     if (this.gameState === 'PLAYING') {
+      if (this.gameMode === 'ENDLESS') {
+        this.endlessElapsed = (this.endlessElapsed || 0) + dt;
+        if (this.endlessElapsed > (this.saveManager.state.stats.endlessBestTime || 0)) {
+          this.saveManager.state.stats.endlessBestTime = this.endlessElapsed;
+        }
+        this.bus.emit('endless:tick', { elapsed: this.endlessElapsed });
+      }
       this.waveSystem.update(dt, this.saveManager.state.wave, this.rocks, this.width);
     }
 
@@ -698,5 +754,16 @@ export class GameEngine {
 
     const activeBoss = this.rocks.find((r) => r.isBoss) || null;
     this.bus.emit('boss:tick', { boss: activeBoss, isPlaying: this.gameState === 'PLAYING' });
+
+    const activeCannon = this.saveManager.getActiveCannon();
+    this.bus.emit('ability:tick', {
+      cooldown: this.cannon.abilityCooldown || 0,
+      maxCooldown: this.cannon.abilityMaxCooldown || 15,
+      activeTimer: this.cannon.abilityActiveTimer || 0,
+      name: activeCannon.ability?.name || 'ABILITY',
+      icon: activeCannon.ability?.icon || '⚡',
+      isReady: (this.cannon.abilityCooldown || 0) <= 0,
+      isPlaying: this.gameState === 'PLAYING',
+    });
   }
 }

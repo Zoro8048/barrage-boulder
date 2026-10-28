@@ -39,6 +39,10 @@
             <button id="pause-btn" class="icon-btn hidden" title="Pause Game (P / Esc)" aria-label="Pause Game">
               ⏸️
             </button>
+            <button id="tech-btn" class="icon-btn" title="Tech Tree &amp; Prestige" aria-label="Tech Tree and Prestige">
+              🧬
+              <span id="tech-notif-dot" class="notif-dot hidden"></span>
+            </button>
             <button id="skins-btn" class="icon-btn" title="Hangar, Loadout &amp; Power-Up Guide" aria-label="Hangar and Loadout">
               🎨
               <span id="hangar-notif-dot" class="notif-dot hidden"></span>
@@ -72,6 +76,7 @@
           <div class="score-display">
             <div id="current-score">0</div>
             <div id="best-score">BEST: 0</div>
+            <div id="endless-timer" class="endless-timer hidden">⏱️ 0:00</div>
             <div id="combo-pill" class="combo-pill hidden">🔥 5x COMBO (1.2x)</div>
             <div id="lobby-mode-wrap" class="lobby-mode-wrap">
               <button type="button" id="mode-toggle-btn" class="mode-chip-btn">
@@ -115,6 +120,25 @@
         <div class="wave-banner-title" id="wave-banner-text">WAVE 1 CLEARED!</div>
         <div class="wave-banner-sub" id="wave-banner-bonus">+50 🪙 BONUS</div>
       </div>
+
+      <!-- Overclock Synergy Notification Banner -->
+      <div id="synergy-banner" class="synergy-banner hidden">
+        <span id="synergy-banner-icon">⚡</span>
+        <div class="synergy-banner-body">
+          <div class="synergy-banner-title" id="synergy-banner-title">OVERCLOCK ACTIVATED</div>
+          <div class="synergy-banner-desc" id="synergy-banner-desc">Particle Beam Storm</div>
+        </div>
+      </div>
+
+      <!-- Tactical Cannon Ability Action Button -->
+      <button type="button" id="ability-btn" class="ability-btn hidden" title="Trigger Tactical Ability (Space)" aria-label="Trigger Tactical Ability">
+        <div class="ability-cooldown-fill" id="ability-cooldown-fill"></div>
+        <div class="ability-icon" id="ability-icon">⚡</div>
+        <div class="ability-info">
+          <span class="ability-name" id="ability-name">BURST</span>
+          <span class="ability-hint">SPACE</span>
+        </div>
+      </button>
 
       <!-- Bottom Upgrade Panel (sits cleanly inside underground foundation below cannon) -->
       <section id="upgrade-panel" class="visible">
@@ -310,15 +334,47 @@
               <div class="section-subtitle first-subtitle">FALLING POWER-UP ORBS</div>
               <div id="powerups-guide-list" class="codex-list"></div>
 
+              <div class="section-subtitle">OVERCLOCK SYNERGIES (POWER-UP FUSIONS)</div>
+              <div id="synergies-guide-list" class="codex-list"></div>
+
               <div class="section-subtitle">SPECIAL BOULDER TYPES</div>
               <div class="legend-grid">
                 <div class="legend-item"><span>🛡️ Armored</span><small>40% dmg resist above 50% HP</small></div>
                 <div class="legend-item"><span>☄️ Meteor</span><small>Fast horizontal, lower bounce</small></div>
                 <div class="legend-item"><span>💚 Healer</span><small>Pulses +10% HP to nearby rocks</small></div>
-                <div class="legend-item"><span>👑 Milestone</span><small>Mega-Boss every 10 waves</small></div>
+                <div class="legend-item"><span>🔗 Tethered</span><small>Binary laser-linked boulder pair</small></div>
+                <div class="legend-item"><span>👑 Milestone</span><small>Mega-Boss with Enraged Phase 2</small></div>
               </div>
             </div>
           </div>
+        </div>
+      </div>
+
+      <!-- Tech Tree & Prestige Modal -->
+      <div id="tech-modal" class="modal-backdrop hidden">
+        <div class="modal-card wide-modal">
+          <button class="modal-close-btn" data-close="tech-modal" aria-label="Close">✕</button>
+          <div class="modal-badge purple-badge">META-PROGRESSION</div>
+          <h2>TECH TREE &amp; PRESTIGE</h2>
+
+          <div class="prestige-card">
+            <div class="prestige-info">
+              <div class="prestige-title">CORE MATRIX PRESTIGE</div>
+              <div class="prestige-desc" id="prestige-desc">
+                Clear Wave 25+ to harvest Core Matrix Crystals. Reset normal upgrades and wave progress in exchange for permanent meta-power!
+              </div>
+              <div class="crystal-balance">
+                <span>Available Crystals: </span>
+                <strong id="tech-crystal-count">💎 0</strong>
+              </div>
+            </div>
+            <button type="button" id="prestige-btn" class="action-btn purple-btn" disabled>
+              PRESTIGE (+0 💎)
+            </button>
+          </div>
+
+          <div class="section-subtitle">PERMANENT TECH PERKS</div>
+          <div id="tech-tree-grid" class="tech-grid"></div>
         </div>
       </div>
 

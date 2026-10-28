@@ -1,6 +1,7 @@
 /**
  * Unlockable Cannon Varieties (Chassis Classes)
- * Each variety changes the cannon's firing pattern, barrel geometry, and combat feel.
+ * Each variety changes the cannon's firing pattern, barrel geometry, combat feel,
+ * and grants a unique Tactical Ability.
  */
 
 export const CANNON_VARIETIES = [
@@ -17,6 +18,13 @@ export const CANNON_VARIETIES = [
     pierceCount: 0,
     splashRadius: 0,
     critBonus: 0,
+    ability: {
+      id: 'overheatBurst',
+      name: 'Overheat Burst',
+      icon: '🔥',
+      desc: '3.0s of 250% hyper fire rate with pinpoint accuracy',
+      cooldown: 12,
+    },
     isUnlocked: () => true,
   },
   {
@@ -32,6 +40,13 @@ export const CANNON_VARIETIES = [
     pierceCount: 0,
     splashRadius: 0,
     critBonus: 0,
+    ability: {
+      id: 'shredderStorm',
+      name: 'Shredder Storm',
+      icon: '🌀',
+      desc: 'Discharges 18 high-velocity piercing flak pellets in a sweeping arc',
+      cooldown: 10,
+    },
     isUnlocked: (s) => s.stats.highestWave >= 3,
   },
   {
@@ -47,6 +62,13 @@ export const CANNON_VARIETIES = [
     pierceCount: 1,
     splashRadius: 0,
     critBonus: 0.08,
+    ability: {
+      id: 'hyperSingularity',
+      name: 'Hyper Singularity',
+      icon: '⚡',
+      desc: 'Fires an ultra-relativistic beam dealing 7x damage through all screen boulders',
+      cooldown: 14,
+    },
     isUnlocked: (s) => s.stats.highestWave >= 7,
   },
   {
@@ -62,6 +84,13 @@ export const CANNON_VARIETIES = [
     pierceCount: 0,
     splashRadius: 0,
     critBonus: 0.1,
+    ability: {
+      id: 'empNova',
+      name: 'EMP Nova',
+      icon: '💥',
+      desc: 'Discharges an expanding EMP ring that chills all boulders and deals heavy damage',
+      cooldown: 12,
+    },
     isUnlocked: (s) => s.stats.highestWave >= 11,
   },
   {
@@ -77,6 +106,13 @@ export const CANNON_VARIETIES = [
     pierceCount: 0,
     splashRadius: 85,
     critBonus: 0,
+    ability: {
+      id: 'clusterCarpet',
+      name: 'Cluster Carpet',
+      icon: '💣',
+      desc: 'Launches 4 artillery shells detonating into cascading explosive clusters',
+      cooldown: 13,
+    },
     isUnlocked: (s) => s.stats.highestWave >= 15,
   },
 ];

@@ -1001,6 +1001,11 @@ html, body {
   color: #091929;
 }
 
+.modal-badge.purple-badge {
+  background: var(--accent-purple);
+  color: #ffffff;
+}
+
 .modal-card h2 {
   font-size: 22px;
   font-weight: 900;
@@ -1591,4 +1596,285 @@ html, body {
   pointer-events: none;
   background: var(--aug-accent, var(--accent-gold));
   color: #0f172a;
+}
+
+/* Endless Mode Timer */
+.endless-timer {
+  display: inline-block;
+  background: rgba(0, 210, 211, 0.2);
+  border: 1px solid #00d2d3;
+  color: #00d2d3;
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.5px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  margin-top: 4px;
+}
+
+/* Tactical Ability Button */
+.ability-btn {
+  position: absolute;
+  right: 14px;
+  bottom: 124px;
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #2b3964 0%, #17213d 100%);
+  border: 2px solid var(--accent-blue);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.55), 0 0 12px rgba(56, 182, 255, 0.35);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 22;
+  overflow: hidden;
+  transition: transform 0.12s ease, box-shadow 0.15s ease, filter 0.15s ease;
+  pointer-events: auto;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.ability-btn:active {
+  transform: scale(0.92);
+}
+
+.ability-btn.ready {
+  border-color: #ff9f43;
+  box-shadow: 0 8px 24px rgba(255, 159, 67, 0.5), 0 0 16px rgba(255, 159, 67, 0.6);
+  animation: abilityReadyPulse 1.4s infinite ease-in-out;
+}
+
+@keyframes abilityReadyPulse {
+  0%, 100% { transform: scale(1); filter: brightness(1); }
+  50% { transform: scale(1.06); filter: brightness(1.2); }
+}
+
+.ability-btn.on-cooldown {
+  opacity: 0.72;
+  cursor: not-allowed;
+  filter: grayscale(0.5);
+}
+
+.ability-cooldown-fill {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(0, 0, 0, 0.62);
+  pointer-events: none;
+  height: 0%;
+  transition: height 0.08s linear;
+}
+
+.ability-icon {
+  font-size: 20px;
+  line-height: 1;
+  position: relative;
+  z-index: 2;
+}
+
+.ability-info {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1;
+  position: relative;
+  z-index: 2;
+  margin-top: 1px;
+}
+
+.ability-name {
+  font-size: 7.5px;
+  font-weight: 900;
+  letter-spacing: 0.5px;
+  color: #ffffff;
+}
+
+.ability-hint {
+  font-size: 6.5px;
+  font-weight: 800;
+  color: var(--accent-gold);
+  letter-spacing: 0.3px;
+  margin-top: 1px;
+}
+
+/* Overclock Synergy Notification Banner */
+.synergy-banner {
+  position: absolute;
+  top: 76px;
+  left: 50%;
+  transform: translate(-50%, 0);
+  z-index: 26;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: linear-gradient(135deg, #3d1b64 0%, #1e133c 100%);
+  border: 2px solid #a55eea;
+  border-radius: 16px;
+  padding: 10px 18px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.65), 0 0 18px rgba(165, 94, 234, 0.45);
+  pointer-events: none;
+  transition: opacity 0.28s ease, transform 0.28s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+}
+
+.synergy-banner.hidden {
+  opacity: 0;
+  transform: translate(-50%, -24px) scale(0.9);
+}
+
+.synergy-banner-body {
+  text-align: left;
+}
+
+.synergy-banner-title {
+  font-size: 9.5px;
+  font-weight: 900;
+  letter-spacing: 1.2px;
+  color: #d1d8e0;
+}
+
+.synergy-banner-desc {
+  font-size: 14px;
+  font-weight: 900;
+  color: #ff9ff3;
+}
+
+/* Tech Tree & Prestige Modal */
+.prestige-card {
+  background: linear-gradient(135deg, #2e1c4e 0%, #181130 100%);
+  border: 2px solid #8854d0;
+  border-radius: 14px;
+  padding: 14px;
+  margin-bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  text-align: left;
+}
+
+.prestige-title {
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.8px;
+  color: #d8bbf5;
+}
+
+.prestige-desc {
+  font-size: 11px;
+  color: #b2bec3;
+  line-height: 1.4;
+}
+
+.crystal-balance {
+  font-size: 12px;
+  color: #dfe6e9;
+}
+
+.crystal-balance strong {
+  color: #a55eea;
+  font-size: 14px;
+}
+
+.purple-btn {
+  background: linear-gradient(180deg, #8854d0 0%, #573295 100%);
+  color: #fff;
+  border: none;
+  font-weight: 900;
+  box-shadow: 0 6px 14px rgba(136, 84, 208, 0.4);
+}
+
+.purple-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.tech-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.tech-node-card {
+  background: rgba(14, 18, 36, 0.85);
+  border: 1.5px solid rgba(136, 84, 208, 0.3);
+  border-radius: 12px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.tech-node-card.unlocked {
+  border-color: #8854d0;
+  background: rgba(136, 84, 208, 0.15);
+}
+
+.tech-node-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.tech-node-icon {
+  font-size: 20px;
+}
+
+.tech-node-badge {
+  font-size: 8.5px;
+  font-weight: 900;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #b2bec3;
+}
+
+.tech-node-badge.unlocked {
+  background: #8854d0;
+  color: #ffffff;
+}
+
+.tech-node-name {
+  font-size: 12px;
+  font-weight: 900;
+  color: #ffffff;
+}
+
+.tech-node-desc {
+  font-size: 10px;
+  color: #a4b0be;
+  line-height: 1.35;
+}
+
+.tech-node-btn {
+  margin-top: 4px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  font-size: 10.5px;
+  font-weight: 900;
+  border: 1px solid #8854d0;
+  background: rgba(136, 84, 208, 0.25);
+  color: #ffffff;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.tech-node-btn:hover:not(:disabled) {
+  background: #8854d0;
+}
+
+.tech-node-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.tech-node-btn.purchased {
+  background: rgba(46, 213, 115, 0.2);
+  border-color: #2ed573;
+  color: #2ed573;
+  cursor: default;
 }

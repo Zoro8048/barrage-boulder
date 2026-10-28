@@ -9,6 +9,7 @@ import { ROCK_VARIANTS, getRockColorTier } from '../config/rockVariants.js';
 import { createRock } from '../entities/Rock.js';
 import { getComboMultiplier } from '../state/UpgradeMath.js';
 import { formatNum } from '../core/utils.js';
+import { getActiveSynergies } from '../config/synergies.js';
 
 export class CombatSystem {
   constructor(bus) {
@@ -23,12 +24,20 @@ export class CombatSystem {
     const spacing = 11;
     const totalSpan = (barrels - 1) * spacing;
 
-    const isOverdrive = activePowerups.rapidFire > 0;
-    const isGiant = activePowerups.giantBullets > 0;
-    const isPierce = activePowerups.piercingLaser > 0;
+    const isOverheat = cannon.abilityActiveTimer > 0;
+    const isOverdrive = activePowerups.rapidFire > 0 || isOverheat;
+    let isGiant = activePowerups.giantBullets > 0;
+    let isPierce = activePowerups.piercingLaser > 0;
     const isExplosive = activePowerups.explosiveRounds > 0;
     const isSpreadPowerup = activePowerups.spreadShot > 0;
     const hasBankShot = engine.activeAugments && engine.activeAugments.includes('wallRicochet');
+
+    const synergies = getActiveSynergies(activePowerups);
+    const hasParticleBeam = synergies.some((s) => s.id === 'particleBeam');
+    const hasMeteorFlak = synergies.some((s) => s.id === 'meteorFlak');
+
+    if (hasParticleBeam) isPierce = true;
+    if (hasMeteorFlak) isGiant = true;
 
     const speed =
       variety.id === 'railgun'
@@ -37,8 +46,8 @@ export class CombatSystem {
         ? PHYSICS.BULLET_SPEED_OVERDRIVE
         : PHYSICS.BULLET_SPEED_NORMAL;
 
-    const pierceLeft = (isPierce ? 3 : 0) + (variety.pierceCount || 0);
-    const splashRadius = isExplosive ? 95 : variety.splashRadius || 0;
+    const pierceLeft = (hasParticleBeam ? 6 : isPierce ? 3 : 0) + (variety.pierceCount || 0);
+    const splashRadius = hasMeteorFlak ? 135 : isExplosive ? 95 : variety.splashRadius || 0;
     const dmgRatio = (variety.damageMult || 1) * (isGiant ? 2.0 : 1.0);
     const bulletRadius = isGiant ? 11.5 : variety.id === 'railgun' ? 7 : isOverdrive ? 6 : 5.5;
 
@@ -223,6 +232,117 @@ export class CombatSystem {
     engine.addParticles(target.x, target.y, '#48dbfb', 6, 150);
   }
 
+  activateCannonAbility(engine) {
+    const { cannon, saveManager, rocks } = engine;
+    if (cannon.abilityCooldown > 0 || engine.gameState !== 'PLAYING') return false;
+
+    const variety = saveManager.getActiveCannon();
+    const ability = variety.ability;
+    if (!ability) return false;
+
+    const baseCooldown = ability.cooldown || 12;
+    const cdMult = saveManager.hasTechPerk && saveManager.hasTechPerk('quantumCapacitors') ? 0.75 : 1.0;
+    cannon.abilityMaxCooldown = baseCooldown * cdMult;
+    cannon.abilityCooldown = cannon.abilityMaxCooldown;
+
+    const baseDmg = engine.getBulletDamage();
+
+    switch (ability.id) {
+      case 'overheatBurst': {
+        cannon.abilityActiveTimer = 3.0;
+        engine.triggerShake(5, 0.2);
+        engine.addShockwave(cannon.x, cannon.y - 20, 100, 'rgba(255, 71, 87, 0.8)');
+        engine.addFloatingText(cannon.x, cannon.y - 50, '🔥 OVERHEAT BURST!', '#ff4757', 16);
+        this.bus.emit('sfx:shoot', { overdrive: true });
+        break;
+      }
+      case 'shredderStorm': {
+        engine.triggerShake(8, 0.25);
+        engine.addShockwave(cannon.x, cannon.y - 20, 120, 'rgba(255, 159, 26, 0.85)');
+        engine.addFloatingText(cannon.x, cannon.y - 50, '🌀 SHREDDER STORM!', '#ff9f1a', 16);
+        const pelletCount = 18;
+        const speed = 780;
+        for (let i = 0; i < pelletCount; i++) {
+          const ang = -Math.PI / 2 + ((i / (pelletCount - 1)) - 0.5) * 1.5;
+          engine.bullets.push(
+            engine.bulletPool.acquire({
+              x: cannon.x,
+              y: cannon.y - 42,
+              vx: Math.cos(ang) * speed,
+              vy: Math.sin(ang) * speed,
+              radius: 7,
+              shape: 'star',
+              spinAngle: Math.random() * Math.PI,
+              bouncesLeft: 1,
+              overdrive: true,
+              isGiant: false,
+              isPierce: true,
+              pierceLeft: 2,
+              splashRadius: 30,
+              spawnClusters: false,
+              damageRatio: 1.2,
+            })
+          );
+        }
+        break;
+      }
+      case 'empNova': {
+        engine.triggerShake(10, 0.3);
+        const empDmg = Math.max(3, Math.round(baseDmg * 5.5));
+        engine.addShockwave(cannon.x, cannon.y - 20, 260, 'rgba(0, 210, 211, 0.85)');
+        engine.addFloatingText(cannon.x, cannon.y - 50, '💥 EMP NOVA!', '#00d2d3', 18);
+        for (const r of rocks) {
+          r.chillTimer = 3.5;
+          engine.addParticles(r.x, r.y, '#00d2d3', 8, 140);
+          this.applyDamageToRock(r, empDmg, engine, { isCrit: true });
+        }
+        break;
+      }
+      case 'hyperSingularity': {
+        engine.triggerShake(12, 0.35);
+        engine.laserBeams.push({
+          x: cannon.x,
+          y: cannon.y - 48,
+          width: 32,
+          color: '#ffcf33',
+          life: 1.2,
+        });
+        const beamDmg = Math.max(5, Math.round(baseDmg * 7.5));
+        engine.addFloatingText(cannon.x, cannon.y - 50, '⚡ HYPER SINGULARITY!', '#ffcf33', 18);
+        for (let j = rocks.length - 1; j >= 0; j--) {
+          const r = rocks[j];
+          if (r && Math.abs(r.x - cannon.x) <= r.radius + 32) {
+            engine.addParticles(cannon.x, r.y, '#ffcf33', 12, 180);
+            this.applyDamageToRock(r, beamDmg, engine, { isCrit: true, isLaser: true });
+          }
+        }
+        break;
+      }
+      case 'clusterCarpet': {
+        engine.triggerShake(10, 0.3);
+        engine.addFloatingText(cannon.x, cannon.y - 50, '💣 CLUSTER CARPET!', '#ff6b6b', 16);
+        for (let i = 0; i < 4; i++) {
+          const targetX = (engine.width / 5) * (i + 1);
+          const mortarDmg = Math.max(3, Math.round(baseDmg * 4.2));
+          setTimeout(() => {
+            engine.addShockwave(targetX, 220, 110, 'rgba(255, 107, 107, 0.85)');
+            engine.addParticles(targetX, 220, '#ff4757', 15, 200);
+            for (const r of rocks) {
+              const d = Math.hypot(r.x - targetX, r.y - 220);
+              if (d <= r.radius + 110) {
+                this.applyDamageToRock(r, mortarDmg, engine, { isCrit: true });
+              }
+            }
+          }, i * 140);
+        }
+        break;
+      }
+    }
+
+    this.bus.emit('cannon:abilityTriggered', { ability, cooldown: cannon.abilityMaxCooldown });
+    return true;
+  }
+
   applyDamageToRock(r, rawDmg, engine, { isCrit = false, isZap = false } = {}) {
     if (!r || r.destroyed || r.hp <= 0) return 0;
     const { rocks, saveManager, waveSystem } = engine;
@@ -250,6 +370,29 @@ export class CombatSystem {
     const actualDmg = Math.min(r.hp, afterArmor);
 
     r.hp -= actualDmg;
+
+    // Multi-phase Milestone Boss: enters Phase 2 (Titan Enraged) at <= 50% HP
+    if (r.isMilestone && !r.isPhaseTwo && r.hp <= r.maxHp * 0.5) {
+      r.isPhaseTwo = true;
+      r.bounceFactor = (r.bounceFactor || 1) * 1.25;
+      r.vx *= 1.35;
+      engine.triggerShake(14, 0.4);
+      engine.addShockwave(r.x, r.y, 220, 'rgba(255, 71, 87, 0.9)');
+      engine.addFloatingText(r.x, r.y - r.radius - 20, '⚡ TITAN ENRAGED! ⚡', '#ff4757', 18);
+      this.bus.emit('boss:phaseTwo', { boss: r });
+    }
+
+    // Resonant Concussion Perk: Crits release AoE kinetic shockwaves
+    if (isCrit && saveManager.hasTechPerk && saveManager.hasTechPerk('critShockwave')) {
+      const shockDmg = Math.max(1, Math.round(actualDmg * 0.35));
+      engine.addShockwave(r.x, r.y, 75, 'rgba(255, 207, 51, 0.55)');
+      for (const other of engine.rocks) {
+        if (other && other !== r && !other.destroyed && other.hp > 0 && Math.hypot(other.x - r.x, other.y - r.y) <= 75 + other.radius) {
+          other.hp = Math.max(0, other.hp - shockDmg);
+          if (other.hp === 0) this.destroyRock(other, -1, engine, false);
+        }
+      }
+    }
 
     // Progressive Fracture Cracks & Debris Shedding
     const col = getRockColorTier(r.maxHp);
@@ -500,6 +643,34 @@ export class CombatSystem {
     engine.addParticles(rock.x, rock.y, col.fill, rock.size * 8, 220);
     this.bus.emit('rock:destroyed', { size: rock.size, isBoss: rock.isBoss });
     engine.triggerShake(rock.size * 3.5, 0.16);
+
+    // Sever Tether if this rock was part of a tethered binary pair
+    if (rock.tetherId) {
+      const tid = rock.tetherId;
+      rock.tetherId = null;
+      engine.addShockwave(rock.x, rock.y, 140, 'rgba(72, 219, 251, 0.9)');
+      engine.addFloatingText(rock.x, rock.y - rock.radius - 12, '⚡ TETHER SEVERED!', '#48dbfb', 15);
+      for (const other of rocks) {
+        if (other && other.tetherId === tid) {
+          other.tetherId = null;
+          engine.addParticles(other.x, other.y, '#48dbfb', 12, 170);
+        }
+      }
+    }
+
+    // Shatterfrost Nova Synergy: exploding frozen rock releases frost shards that freeze neighbors
+    const syns = getActiveSynergies(engine.activePowerups);
+    if (syns.some((s) => s.id === 'shatterfrost') && (rock.chillTimer > 0 || engine.activePowerups.freeze > 0)) {
+      engine.addShockwave(rock.x, rock.y, 120, 'rgba(84, 160, 255, 0.85)');
+      engine.addFloatingText(rock.x, rock.y - rock.radius - 12, '❄️ SHATTERFROST!', '#54a0ff', 15);
+      for (let k = rocks.length - 1; k >= 0; k--) {
+        const other = rocks[k];
+        if (other && other !== rock && !other.destroyed && other.hp > 0 && Math.hypot(other.x - rock.x, other.y - rock.y) <= 120 + other.radius) {
+          other.chillTimer = 3.0;
+          this.applyDamageToRock(other, Math.max(2, Math.round(engine.getBulletDamage() * 1.5)), engine, { isCrit: true });
+        }
+      }
+    }
 
     if (!fromUltimate) {
       engine.addUltimateCharge(COMBAT.ULTIMATE_CHARGE_PER_KILL);

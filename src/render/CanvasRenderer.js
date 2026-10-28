@@ -116,6 +116,9 @@ export class CanvasRenderer {
       }
     }
 
+    // Tether Electric Laser Beams
+    this.drawTetherBeams(engine.rocks, time);
+
     // Rocks
     for (const r of engine.rocks) {
       this.drawRock(r, engine.activePowerups.freeze > 0);
@@ -148,6 +151,9 @@ export class CanvasRenderer {
       ctx.fillText(ft.text, ft.x, ft.y);
     }
     ctx.globalAlpha = 1;
+
+    // Critical Low Hull Warning Vignette
+    this.drawLowHullVignette(width, height, time);
 
     ctx.restore();
   }
@@ -463,6 +469,17 @@ export class CanvasRenderer {
       ctx.stroke();
     }
 
+    if (r.isPhaseTwo) {
+      const ragePulse = 0.5 + 0.5 * Math.sin(Date.now() * 0.012);
+      ctx.beginPath();
+      ctx.arc(0, 0, r.radius + 10 + ragePulse * 6, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(255, 71, 87, ${0.15 + 0.15 * ragePulse})`;
+      ctx.fill();
+      ctx.lineWidth = 2.5;
+      ctx.strokeStyle = `rgba(255, 107, 129, ${0.6 + 0.4 * ragePulse})`;
+      ctx.stroke();
+    }
+
     ctx.save();
     ctx.rotate(r.angle);
 
@@ -532,11 +549,11 @@ export class CanvasRenderer {
     } else if (r.isMilestone) {
       ctx.font = '21px sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText('👑', 0, -r.radius - 10);
+      ctx.fillText(r.isPhaseTwo ? '👑⚡' : '👑', 0, -r.radius - 10);
     } else if (r.isBoss) {
       ctx.font = '18px sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText('👑', 0, -r.radius - 8);
+      ctx.fillText(r.isPhaseTwo ? '👑⚡' : '👑', 0, -r.radius - 8);
     } else if (hasArmor) {
       ctx.font = '13px sans-serif';
       ctx.textAlign = 'center';
@@ -549,6 +566,12 @@ export class CanvasRenderer {
       ctx.font = '13px sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText('☄️', 0, -r.radius - 6);
+    }
+
+    if (r.tetherId) {
+      ctx.font = '12px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('🔗', 0, r.radius + 12);
     }
 
     const label = formatNum(r.hp);
@@ -784,6 +807,82 @@ export class CanvasRenderer {
     ctx.fillStyle = rimColor;
     ctx.fill();
 
+    ctx.restore();
+  }
+
+  drawTetherBeams(rocks, time) {
+    if (!rocks || rocks.length < 2) return;
+    const { ctx } = this;
+    const pairs = new Map();
+    for (const r of rocks) {
+      if (r.tetherId) {
+        if (!pairs.has(r.tetherId)) {
+          pairs.set(r.tetherId, []);
+        }
+        pairs.get(r.tetherId).push(r);
+      }
+    }
+
+    for (const [, group] of pairs) {
+      if (group.length >= 2) {
+        const [a, b] = group;
+        ctx.save();
+        const pulse = 0.6 + 0.4 * Math.sin(time * 0.015);
+        ctx.lineWidth = 2.5 + pulse * 1.5;
+        ctx.strokeStyle = `rgba(255, 71, 87, ${pulse})`;
+        ctx.setLineDash([8, 4]);
+        ctx.lineDashOffset = -time * 0.05;
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(b.x, b.y);
+        ctx.stroke();
+
+        // Inner white laser core
+        ctx.lineWidth = 1.2;
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+        ctx.setLineDash([]);
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(b.x, b.y);
+        ctx.stroke();
+
+        // Central tether node spark
+        const midX = (a.x + b.x) / 2;
+        const midY = (a.y + b.y) / 2;
+        ctx.fillStyle = '#ff4757';
+        ctx.beginPath();
+        ctx.arc(midX, midY, 3.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.restore();
+      }
+    }
+  }
+
+  drawLowHullVignette(width, height, time) {
+    const { ctx, engine } = this;
+    if (!engine || !engine.cannon || engine.state !== 'PLAYING') return;
+    const cannon = engine.cannon;
+    const ratio = cannon.hp / Math.max(1, cannon.maxHp);
+    if (ratio > 0.35 && cannon.hp > 1) return;
+
+    const pulse = 0.5 + 0.5 * Math.sin(time * 0.008);
+    const intensity = (1 - ratio) * (0.2 + 0.25 * pulse);
+
+    ctx.save();
+    const grad = ctx.createRadialGradient(
+      width / 2,
+      height / 2,
+      Math.min(width, height) * 0.3,
+      width / 2,
+      height / 2,
+      Math.max(width, height) * 0.75
+    );
+    grad.addColorStop(0, 'rgba(255, 0, 0, 0)');
+    grad.addColorStop(1, `rgba(255, 20, 20, ${intensity})`);
+
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, width, height);
     ctx.restore();
   }
 }

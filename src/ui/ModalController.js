@@ -10,6 +10,8 @@ import { CANNON_VARIETIES } from '../config/cannons.js';
 import { CANNON_ADDONS } from '../config/addons.js';
 import { POWERUP_META } from '../config/powerups.js';
 import { ACHIEVEMENTS } from '../config/achievements.js';
+import { TECH_TREE_NODES, calculatePrestigeReward, PRESTIGE_MIN_WAVE } from '../config/techTree.js';
+import { OVERCLOCK_SYNERGIES } from '../config/synergies.js';
 import {
   getUpgradeCost,
   getBaseFireRateShotsPerSec,
@@ -54,6 +56,14 @@ export class ModalController {
     this.augmentModalEl = document.getElementById('augment-modal');
     this.augmentCardListEl = document.getElementById('augment-card-list');
 
+    this.techModalEl = document.getElementById('tech-modal');
+    this.techBtn = document.getElementById('tech-btn');
+    this.techNotifDotEl = document.getElementById('tech-notif-dot');
+    this.prestigeBtn = document.getElementById('prestige-btn');
+    this.prestigeDescEl = document.getElementById('prestige-desc');
+    this.techCrystalCountEl = document.getElementById('tech-crystal-count');
+    this.techTreeGridEl = document.getElementById('tech-tree-grid');
+
     this.skinsBtn = document.getElementById('skins-btn');
     this.statsBtn = document.getElementById('stats-btn');
     this.settingsBtn = document.getElementById('settings-btn');
@@ -83,6 +93,7 @@ export class ModalController {
       !this.skinsModalEl.classList.contains('hidden') ||
       !this.statsModalEl.classList.contains('hidden') ||
       !this.settingsModalEl.classList.contains('hidden') ||
+      (this.techModalEl && !this.techModalEl.classList.contains('hidden')) ||
       (this.augmentModalEl && !this.augmentModalEl.classList.contains('hidden')) ||
       (this.disclaimerModalEl && !this.disclaimerModalEl.classList.contains('hidden'))
     );
@@ -187,6 +198,12 @@ export class ModalController {
       this.settingsModalEl.classList.remove('hidden');
     };
 
+    const openTech = () => {
+      this.audioService.init();
+      this.renderTechModal();
+      this.techModalEl?.classList.remove('hidden');
+    };
+
     const openDisclaimer = (e) => {
       e?.stopPropagation();
       this.settingsModalEl?.classList.add('hidden');
@@ -196,6 +213,7 @@ export class ModalController {
     this.skinsBtn.addEventListener('click', openSkins);
     this.lobbyLoadoutBtn?.addEventListener('click', openSkins);
     this.openSkinsFooterBtn?.addEventListener('click', openSkins);
+    this.techBtn?.addEventListener('click', openTech);
     this.statsBtn.addEventListener('click', openStats);
     this.openStatsFooterBtn?.addEventListener('click', openStats);
     this.settingsBtn.addEventListener('click', openSettings);
@@ -219,8 +237,8 @@ export class ModalController {
       this.audioService.init();
       if (!this.engine.isBossRushUnlocked()) {
         this.bus.emit('ui:banner', {
-          title: '🔒 BOSS RUSH LOCKED',
-          sub: 'Reach Wave 6 to unlock 2x Coin Boss Rush!',
+          title: '🔒 EXTRA MODES LOCKED',
+          sub: 'Reach Wave 6 for Boss Rush, Wave 10 for Endless!',
           isAlert: true,
         });
         return;
@@ -362,14 +380,13 @@ export class ModalController {
 
   updateModeButton() {
     if (!this.modeToggleBtn) return;
-    if (!this.engine.isBossRushUnlocked()) {
-      this.modeToggleBtn.textContent = '🔒 Boss Rush (Wave 6)';
-      return;
+    if (this.engine.gameMode === 'ENDLESS') {
+      this.modeToggleBtn.textContent = '⏱️ Mode: Endless';
+    } else if (this.engine.gameMode === 'BOSS_RUSH') {
+      this.modeToggleBtn.textContent = '👑 Mode: Boss Rush (2x 🪙)';
+    } else {
+      this.modeToggleBtn.textContent = '🌊 Mode: Standard';
     }
-    this.modeToggleBtn.textContent =
-      this.engine.gameMode === 'BOSS_RUSH'
-        ? '👑 Mode: Boss Rush (2x 🪙)'
-        : '🌊 Mode: Standard';
   }
 
   renderSkinsModal() {
@@ -521,6 +538,104 @@ export class ModalController {
           </div>`
         )
         .join('');
+    }
+
+    const synergiesGuideEl = document.getElementById('synergies-guide-list');
+    if (synergiesGuideEl) {
+      synergiesGuideEl.innerHTML = Object.values(OVERCLOCK_SYNERGIES)
+        .map((syn) => {
+          const reqLabels = syn.requires
+            .map((r) => POWERUP_META[r]?.label || r)
+            .join(' + ');
+          return `<div class="codex-card" style="border-color:${syn.color}66">
+            <div class="codex-orb" style="border-color:${syn.color}">${syn.icon}</div>
+            <div class="codex-body">
+              <div class="codex-header">
+                <div class="codex-title-group">
+                  <span class="codex-name" style="color:${syn.color}">${syn.name}</span>
+                  <span class="codex-tag" style="border:1px solid ${syn.color}55">FUSION</span>
+                </div>
+                <span class="codex-duration">REQ: ${reqLabels}</span>
+              </div>
+              <div class="codex-desc">${syn.desc}</div>
+            </div>
+          </div>`;
+        })
+        .join('');
+    }
+  }
+
+  renderTechModal() {
+    const save = this.engine.saveManager.state;
+    if (this.techCrystalCountEl) {
+      this.techCrystalCountEl.textContent = `💎 ${formatNum(save.crystals || 0)}`;
+    }
+
+    const reward = calculatePrestigeReward(save.wave);
+    if (this.prestigeDescEl && this.prestigeBtn) {
+      if (save.wave < PRESTIGE_MIN_WAVE) {
+        this.prestigeDescEl.textContent = `Reach Wave ${PRESTIGE_MIN_WAVE} to harvest Core Matrix Crystals. (Currently at Wave ${save.wave})`;
+        this.prestigeBtn.disabled = true;
+        this.prestigeBtn.textContent = `LOCKED (Wave ${PRESTIGE_MIN_WAVE})`;
+      } else {
+        this.prestigeDescEl.textContent = `Prestige now to reset current wave and upgrades, harvesting ${reward} Core Matrix Crystals!`;
+        this.prestigeBtn.disabled = false;
+        this.prestigeBtn.textContent = `PRESTIGE (+${reward} 💎)`;
+      }
+
+      this.prestigeBtn.onclick = () => {
+        this.audioService.init();
+        const harvested = this.engine.saveManager.prestige();
+        if (harvested > 0) {
+          this.audioService.playOverclockFanfare();
+          this.engine.returnToLobby();
+          this.renderTechModal();
+          this.updateUpgradeButtons();
+          this.bus.emit('state:updated', this.engine.saveManager.state);
+          this.bus.emit('ui:banner', {
+            title: '💎 PRESTIGE HARVEST!',
+            sub: `+${harvested} Core Matrix Crystals harvested!`,
+            isAlert: false,
+          });
+        }
+      };
+    }
+
+    if (this.techTreeGridEl) {
+      this.techTreeGridEl.innerHTML = TECH_TREE_NODES.map((node) => {
+        const unlocked = Boolean(save.techTree && save.techTree[node.id]);
+        const affordable = !unlocked && (save.crystals || 0) >= node.cost;
+        return `
+          <div class="tech-node-card ${unlocked ? 'unlocked' : ''}">
+            <div class="tech-node-header">
+              <span class="tech-node-icon">${node.icon}</span>
+              <span class="tech-node-badge ${unlocked ? 'unlocked' : ''}">
+                ${unlocked ? 'ACTIVE' : `${node.cost} 💎`}
+              </span>
+            </div>
+            <div class="tech-node-name">${node.name}</div>
+            <div class="tech-node-desc">${node.desc}</div>
+            <button type="button" class="tech-node-btn ${unlocked ? 'purchased' : ''}"
+              data-tech-id="${node.id}"
+              ${unlocked ? 'disabled' : !affordable ? 'disabled' : ''}>
+              ${unlocked ? 'UNLOCKED ✅' : `UNLOCK (${node.cost} 💎)`}
+            </button>
+          </div>
+        `;
+      }).join('');
+
+      this.techTreeGridEl.querySelectorAll('[data-tech-id]').forEach((btn) => {
+        btn.onclick = () => {
+          const id = btn.getAttribute('data-tech-id');
+          this.audioService.init();
+          if (this.engine.saveManager.unlockTechNode(id)) {
+            this.audioService.playUpgrade();
+            this.renderTechModal();
+            this.updateUpgradeButtons();
+            this.bus.emit('state:updated', save);
+          }
+        };
+      });
     }
   }
 

@@ -21,6 +21,9 @@ export class Cannon {
     this.teslaCooldown = 1.2;
     this.teslaArc = null; // { targetX, targetY, timer }
     this.muzzleFlash = 0;
+    this.abilityCooldown = 0;
+    this.abilityMaxCooldown = 12;
+    this.abilityActiveTimer = 0;
   }
 
   setBounds(width, groundY) {
@@ -59,6 +62,8 @@ export class Cannon {
     if (this.droneCooldown > 0) this.droneCooldown -= dt;
     if (this.sawCooldown > 0) this.sawCooldown = Math.max(0, this.sawCooldown - dt);
     if (this.teslaCooldown > 0) this.teslaCooldown -= dt;
+    if (this.abilityCooldown > 0) this.abilityCooldown = Math.max(0, this.abilityCooldown - dt);
+    if (this.abilityActiveTimer > 0) this.abilityActiveTimer = Math.max(0, this.abilityActiveTimer - dt);
     if (this.teslaArc) {
       this.teslaArc.timer -= dt;
       if (this.teslaArc.timer <= 0) this.teslaArc = null;

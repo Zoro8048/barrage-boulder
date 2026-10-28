@@ -93,6 +93,9 @@ export class WaveSystem {
     this.waveDamageDealt = 0;
     this.spawnTimer = 0.4;
     this.viewportWidth = 400;
+    this.isEndless = false;
+    this.endlessTimer = 0;
+    this.playerDPS = null;
   }
 
   getViewportLimits(width = 400) {
@@ -129,12 +132,15 @@ export class WaveSystem {
   setupWave(waveNum, isPlaying = false, rng = Math.random, isBossRush = false, options = {}) {
     this.waveRocksToSpawn = [];
     this.waveDamageDealt = 0;
+    this.isEndless = Boolean(options.isEndless);
+    this.endlessTimer = 0;
     if (options.viewportWidth) this.viewportWidth = options.viewportWidth;
 
-    const isMilestoneWave = waveNum % 10 === 0 || (isBossRush && waveNum % 3 === 0);
-    const isBossWave = isBossRush || waveNum % 3 === 0 || isMilestoneWave;
+    const isMilestoneWave = !this.isEndless && (waveNum % 10 === 0 || (isBossRush && waveNum % 3 === 0));
+    const isBossWave = !this.isEndless && (isBossRush || waveNum % 3 === 0 || isMilestoneWave);
 
     const playerDPS = options.playerDPS || null;
+    this.playerDPS = playerDPS;
     const baseHP = getWaveBaseHP(waveNum, playerDPS);
 
     if (isBossRush) {
@@ -164,6 +170,10 @@ export class WaveSystem {
         ? 3 + Math.min(2, Math.floor(waveNum * 0.05))
         : 4 + Math.min(4, Math.floor(waveNum * 0.08));
 
+      // Occasional Tethered Boulder Pair (wave 5+, ~30% chance)
+      const hasTether = !this.isEndless && waveNum >= 5 && rockCount >= 5 && rng() < 0.35;
+      const tetherId = hasTether ? `tether_w${waveNum}` : null;
+
       for (let i = 0; i < rockCount; i++) {
         const isFinalRock = i === rockCount - 1;
         const isBoss = isFinalRock && isBossWave;
@@ -191,6 +201,7 @@ export class WaveSystem {
         else if (variant === 'goldGeode') sizeMult = 0.85;
 
         const hp = Math.max(1, Math.round(baseHP * sizeMult * (0.85 + rng() * 0.3)));
+        const isTethered = Boolean(tetherId && (i === 1 || i === 2));
 
         this.waveRocksToSpawn.push({
           size,
@@ -200,6 +211,7 @@ export class WaveSystem {
           variant,
           fromLeft: rng() < 0.5,
           spawnYRatio: rng(),
+          tetherId: isTethered ? tetherId : null,
         });
       }
     }
@@ -221,6 +233,27 @@ export class WaveSystem {
   }
 
   update(dt, waveNum, activeRocks, width) {
+    if (this.isEndless) {
+      this.endlessTimer += dt;
+      if (this.waveRocksToSpawn.length < 3) {
+        const elapsed = this.endlessTimer;
+        const simWave = Math.max(1, Math.floor(elapsed / 10) + 1);
+        const isBoss = Math.random() < 0.16;
+        const size = isBoss ? 3 : Math.random() < 0.35 ? 1 : 2;
+        const baseHP = getWaveBaseHP(simWave, this.playerDPS);
+        const hp = Math.max(2, Math.round(baseHP * (isBoss ? 2.6 : size === 3 ? 2.0 : 1.2)));
+        this.waveRocksToSpawn.push({
+          size,
+          hp,
+          isBoss,
+          isMilestone: false,
+          variant: pickRockVariant(simWave, isBoss, false),
+          fromLeft: Math.random() < 0.5,
+          spawnYRatio: Math.random(),
+        });
+      }
+    }
+
     if (this.waveRocksToSpawn.length === 0) return;
     if (width) this.viewportWidth = width;
 
@@ -295,6 +328,7 @@ export class WaveSystem {
       isMilestone: spec.isMilestone,
       variant: spec.variant,
       fromSplit: false,
+      tetherId: spec.tetherId || null,
     });
 
     activeRocks.push(rock);

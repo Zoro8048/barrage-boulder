@@ -199,10 +199,15 @@ export class PhysicsSystem {
   }
 
   updateCoins(dt, engine) {
-    const { coins, cannon, width, groundY, activePowerups } = engine;
+    const { coins, cannon, width, groundY, activePowerups, saveManager } = engine;
     const isMagnet = activePowerups.magnet > 0;
-    const magnetRange = isMagnet ? PHYSICS.BOOSTED_MAGNET_RANGE : PHYSICS.DEFAULT_MAGNET_RANGE;
-    const magnetSpeed = isMagnet ? PHYSICS.BOOSTED_MAGNET_SPEED : PHYSICS.DEFAULT_MAGNET_SPEED;
+    const hasVortex = activePowerups.shield > 0 && isMagnet;
+    const hasMagnetTech = saveManager.hasTechPerk && saveManager.hasTechPerk('magneticInduction');
+    const baseRange = (PHYSICS.DEFAULT_MAGNET_RANGE || 115) * (hasMagnetTech ? 1.5 : 1.0);
+    const magnetRange = hasVortex ? 1200 : isMagnet ? PHYSICS.BOOSTED_MAGNET_RANGE : baseRange;
+    const magnetSpeed =
+      (hasVortex ? 950 : isMagnet ? PHYSICS.BOOSTED_MAGNET_SPEED : PHYSICS.DEFAULT_MAGNET_SPEED) *
+      (hasMagnetTech ? 1.25 : 1.0);
 
     for (let i = coins.length - 1; i >= 0; i--) {
       const c = coins[i];

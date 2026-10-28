@@ -49,6 +49,18 @@ export class HudController {
     this.waveBannerTextEl = document.getElementById('wave-banner-text');
     this.waveBannerBonusEl = document.getElementById('wave-banner-bonus');
 
+    this.abilityBtn = document.getElementById('ability-btn');
+    this.abilityCooldownFillEl = document.getElementById('ability-cooldown-fill');
+    this.abilityNameEl = document.getElementById('ability-name');
+    this.abilityIconEl = document.getElementById('ability-icon');
+
+    this.endlessTimerEl = document.getElementById('endless-timer');
+    this.synergyBannerEl = document.getElementById('synergy-banner');
+    this.synergyBannerTitleEl = document.getElementById('synergy-banner-title');
+    this.synergyBannerDescEl = document.getElementById('synergy-banner-desc');
+    this.synergyBannerIconEl = document.getElementById('synergy-banner-icon');
+    this.synergyTimeout = null;
+
     this.bindEvents();
   }
 
@@ -129,11 +141,33 @@ export class HudController {
       this.toggleCleanHud();
     });
 
+    this.abilityBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.engine.triggerCannonAbility();
+    });
+
+    this.bus.on('ability:tick', (data) => {
+      this.updateAbilityUI(data);
+    });
+
+    this.bus.on('endless:tick', ({ elapsed }) => {
+      this.updateEndlessTimer(elapsed);
+    });
+
+    this.bus.on('synergy:activated', (synergy) => {
+      this.showSynergyBanner(synergy);
+    });
+
     window.addEventListener('keydown', (e) => {
+      const isFocusInput = ['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName);
+      if (isFocusInput) return;
+
       if (e.key === 'h' || e.key === 'H') {
-        const isFocusInput = ['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName);
-        if (!isFocusInput) {
-          this.toggleCleanHud();
+        this.toggleCleanHud();
+      } else if (e.code === 'Space' || e.key === ' ') {
+        if (this.engine.gameState === 'PLAYING') {
+          e.preventDefault();
+          this.engine.triggerCannonAbility();
         }
       }
     });
@@ -155,11 +189,18 @@ export class HudController {
       this.pauseBtn?.classList.remove('hidden');
       this.hullHudEl?.classList.remove('hidden');
       this.augmentHudEl?.classList.remove('hidden');
+      if (this.engine.gameMode === 'ENDLESS') {
+        this.endlessTimerEl?.classList.remove('hidden');
+      } else {
+        this.endlessTimerEl?.classList.add('hidden');
+      }
+      this.abilityBtn?.classList.remove('hidden');
       this.updateCleanHudUI();
     });
 
     this.bus.on('run:resumed', () => {
       this.pauseBtn?.classList.remove('hidden');
+      this.abilityBtn?.classList.remove('hidden');
       this.updateCleanHudUI();
     });
 
@@ -169,6 +210,8 @@ export class HudController {
       this.lobbyModeWrapEl?.classList.add('hidden');
       this.hullHudEl?.classList.add('hidden');
       this.augmentHudEl?.classList.add('hidden');
+      this.abilityBtn?.classList.add('hidden');
+      this.endlessTimerEl?.classList.add('hidden');
       this.hudMiddleZoneEl?.classList.remove('hidden-hud');
     });
 
@@ -181,6 +224,8 @@ export class HudController {
       this.upgradePanelEl.classList.remove('hidden');
       this.hullHudEl?.classList.add('hidden');
       this.augmentHudEl?.classList.add('hidden');
+      this.abilityBtn?.classList.add('hidden');
+      this.endlessTimerEl?.classList.add('hidden');
       this.hudMiddleZoneEl?.classList.remove('hidden-hud');
       this.updateCleanHudUI();
     });
@@ -350,5 +395,42 @@ export class HudController {
     this.toastTimeout = setTimeout(() => {
       this.achToastEl.classList.add('hidden');
     }, 3400);
+  }
+
+  updateAbilityUI({ cooldown, maxCooldown, name, icon, isReady, isPlaying }) {
+    if (!this.abilityBtn) return;
+    if (!isPlaying) {
+      this.abilityBtn.classList.add('hidden');
+      return;
+    }
+    this.abilityBtn.classList.remove('hidden');
+    if (this.abilityNameEl) this.abilityNameEl.textContent = name;
+    if (this.abilityIconEl) this.abilityIconEl.textContent = icon;
+    this.abilityBtn.classList.toggle('ready', isReady);
+    this.abilityBtn.classList.toggle('on-cooldown', !isReady);
+    const pct = maxCooldown > 0 ? (cooldown / maxCooldown) * 100 : 0;
+    if (this.abilityCooldownFillEl) {
+      this.abilityCooldownFillEl.style.height = `${pct}%`;
+    }
+  }
+
+  updateEndlessTimer(elapsed) {
+    if (!this.endlessTimerEl) return;
+    const mins = Math.floor(elapsed / 60);
+    const secs = Math.floor(elapsed % 60);
+    this.endlessTimerEl.textContent = `⏱️ ${mins}:${secs < 10 ? '0' : ''}${secs}`;
+    this.endlessTimerEl.classList.remove('hidden');
+  }
+
+  showSynergyBanner(synergy) {
+    if (!this.synergyBannerEl) return;
+    if (this.synergyBannerTitleEl) this.synergyBannerTitleEl.textContent = 'OVERCLOCK ACTIVATED!';
+    if (this.synergyBannerDescEl) this.synergyBannerDescEl.textContent = `${synergy.icon} ${synergy.name}`;
+    if (this.synergyBannerIconEl) this.synergyBannerIconEl.textContent = synergy.icon;
+    this.synergyBannerEl.classList.remove('hidden');
+    if (this.synergyTimeout) clearTimeout(this.synergyTimeout);
+    this.synergyTimeout = setTimeout(() => {
+      this.synergyBannerEl?.classList.add('hidden');
+    }, 2800);
   }
 }

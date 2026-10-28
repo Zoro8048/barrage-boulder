@@ -22,6 +22,8 @@ const MODULE_ORDER = [
   'src/config/addons.js',
   'src/config/augments.js',
   'src/config/powerups.js',
+  'src/config/synergies.js',
+  'src/config/techTree.js',
   'src/config/rockVariants.js',
   'src/config/achievements.js',
   'src/core/EventBus.js',

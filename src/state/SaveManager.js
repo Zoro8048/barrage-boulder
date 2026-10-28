@@ -9,11 +9,15 @@ import { ARENA_THEMES } from '../config/themes.js';
 import { CANNON_VARIETIES } from '../config/cannons.js';
 import { CANNON_ADDONS } from '../config/addons.js';
 import { calculateOfflineEarnings } from './UpgradeMath.js';
+import { TECH_TREE_NODES, calculatePrestigeReward } from '../config/techTree.js';
 
 export function createDefaultSave(now = Date.now()) {
   return {
     version: SAVE_SCHEMA_VERSION,
     coins: 0,
+    crystals: 0,
+    prestigeCount: 0,
+    techTree: [],
     bestScore: 0,
     wave: 1,
     upgrades: {
@@ -36,6 +40,7 @@ export function createDefaultSave(now = Date.now()) {
     },
     stats: {
       highestWave: 1,
+      endlessBestTime: 0,
       rocksDestroyed: 0,
       bossesDefeated: 0,
       totalCoinsEarned: 0,
@@ -58,6 +63,9 @@ export function migrateSaveData(parsed, now = Date.now()) {
     ...def,
     ...parsed,
     version: SAVE_SCHEMA_VERSION,
+    crystals: Number(parsed.crystals || 0),
+    prestigeCount: Number(parsed.prestigeCount || 0),
+    techTree: Array.isArray(parsed.techTree) ? [...parsed.techTree] : [],
     upgrades: { ...def.upgrades, ...(parsed.upgrades || {}) },
     equipped: { ...def.equipped, ...(parsed.equipped || {}) },
     settings: { ...def.settings, ...(parsed.settings || {}) },
@@ -130,5 +138,40 @@ export class SaveManager {
   getPendingOfflineReward(now = Date.now()) {
     const elapsedSeconds = (now - (this.state.lastTimestamp || now)) / 1000;
     return calculateOfflineEarnings(elapsedSeconds, this.state.upgrades.offlineEarnings);
+  }
+
+  prestige(rewardCrystals = null) {
+    const reward = Number.isFinite(rewardCrystals)
+      ? rewardCrystals
+      : calculatePrestigeReward(this.state.wave);
+    if (reward <= 0) return 0;
+    this.state.crystals = (this.state.crystals || 0) + reward;
+    this.state.prestigeCount = (this.state.prestigeCount || 0) + 1;
+    this.state.wave = 1;
+    this.state.upgrades.fireRate = 1;
+    this.state.upgrades.firePower = 1;
+    this.state.upgrades.coinValue = 1;
+    this.state.upgrades.offlineEarnings = 1;
+    this.persist();
+    return reward;
+  }
+
+  unlockTechNode(nodeId, cost = null) {
+    if (!this.state.techTree) this.state.techTree = [];
+    if (this.state.techTree.includes(nodeId)) return false;
+    let nodeCost = cost;
+    if (nodeCost === null) {
+      const node = TECH_TREE_NODES.find((n) => n.id === nodeId);
+      nodeCost = node ? node.cost : 1;
+    }
+    if ((this.state.crystals || 0) < nodeCost) return false;
+    this.state.crystals -= nodeCost;
+    this.state.techTree.push(nodeId);
+    this.persist();
+    return true;
+  }
+
+  hasTechPerk(nodeId) {
+    return Boolean(this.state.techTree?.includes(nodeId));
   }
 }

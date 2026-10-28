@@ -16,6 +16,7 @@ export function createRock({
   isMilestone = false,
   variant = 'normal',
   fromSplit = false,
+  tetherId = null,
 }) {
   const bossScale = isMilestone ? 1.32 : isBoss ? 1.18 : 1;
   const radius = (ROCK_RADII[size] || 36) * bossScale;
@@ -57,6 +58,9 @@ export function createRock({
     maxHp: hp,
     isBoss,
     isMilestone,
+    isPhaseTwo: false,
+    tetherId,
+    rageTimer: 0,
     variant,
     bounceFactor,
     armorBroken: variant !== 'armored',

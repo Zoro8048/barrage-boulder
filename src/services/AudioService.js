@@ -31,6 +31,9 @@ export class AudioService {
     this.bus.on('wave:cleared', () => this.playWaveClear());
     this.bus.on('wave:milestoneAlert', () => this.playBossAlert());
     this.bus.on('boss:spawned', () => this.playBossAlert());
+    this.bus.on('boss:phaseTwo', () => this.playTitanRageAlert());
+    this.bus.on('synergy:activated', () => this.playOverclockFanfare());
+    this.bus.on('cannon:abilityTriggered', () => this.playAbilitySound());
     this.bus.on('run:gameover', () => this.playGameOver());
   }
 
@@ -52,10 +55,22 @@ export class AudioService {
 
   startMusicLoop() {
     if (this.musicTimer) return;
-    const scale = [130.81, 164.81, 196.0, 220.0, 261.63, 196.0, 164.81, 146.83];
-    this.musicTimer = setInterval(() => {
-      if (!this.ctx || this.ctx.state !== 'running' || this.musicVolume <= 0.01) return;
-      if (!this.engine || this.engine.gameState !== 'PLAYING') return;
+    const normalScale = [130.81, 164.81, 196.0, 220.0, 261.63, 196.0, 164.81, 146.83];
+    const bossScale = [110.0, 130.81, 146.83, 164.81, 110.0, 123.47, 130.81, 164.81];
+
+    const tick = () => {
+      if (!this.ctx || this.ctx.state !== 'running' || this.musicVolume <= 0.01) {
+        this.musicTimer = setTimeout(tick, 220);
+        return;
+      }
+      if (!this.engine || this.engine.gameState !== 'PLAYING') {
+        this.musicTimer = setTimeout(tick, 220);
+        return;
+      }
+
+      const hasBoss = this.engine.rocks?.some((r) => r.isBoss);
+      const scale = hasBoss ? bossScale : normalScale;
+      const interval = hasBoss ? 160 : 220;
 
       const t = this.ctx.currentTime;
       const osc = this.ctx.createOscillator();
@@ -63,18 +78,36 @@ export class AudioService {
       const note = scale[this.musicStep % scale.length];
       this.musicStep++;
 
-      osc.type = 'triangle';
+      osc.type = hasBoss ? 'sawtooth' : 'triangle';
       osc.frequency.setValueAtTime(note, t);
 
-      const vol = 0.035 * this.musicVolume;
+      const vol = (hasBoss ? 0.045 : 0.035) * this.musicVolume;
       gain.gain.setValueAtTime(vol, t);
-      gain.gain.exponentialRampToValueAtTime(0.0008, t + 0.19);
+      gain.gain.exponentialRampToValueAtTime(0.0008, t + (interval / 1000) * 0.9);
 
       osc.connect(gain);
       gain.connect(this.ctx.destination);
       osc.start(t);
-      osc.stop(t + 0.2);
-    }, 220);
+      osc.stop(t + interval / 1000);
+
+      // Low hull heartbeat pulse on 1 HP
+      if (this.engine.hull === 1 && this.musicStep % 4 === 0) {
+        const hOsc = this.ctx.createOscillator();
+        const hGain = this.ctx.createGain();
+        hOsc.type = 'sine';
+        hOsc.frequency.setValueAtTime(55, t);
+        hGain.gain.setValueAtTime(0.08 * this.musicVolume, t);
+        hGain.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+        hOsc.connect(hGain);
+        hGain.connect(this.ctx.destination);
+        hOsc.start(t);
+        hOsc.stop(t + 0.19);
+      }
+
+      this.musicTimer = setTimeout(tick, interval);
+    };
+
+    this.musicTimer = setTimeout(tick, 220);
   }
 
   playShoot(isOverdrive = false) {
@@ -264,5 +297,55 @@ export class AudioService {
       osc.start(t + i * 0.1);
       osc.stop(t + i * 0.1 + 0.24);
     });
+  }
+
+  playAbilitySound() {
+    if (this.sfxVolume <= 0.01 || !this.ctx) return;
+    const t = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(220, t);
+    osc.frequency.exponentialRampToValueAtTime(880, t + 0.25);
+    gain.gain.setValueAtTime(0.18 * this.sfxVolume, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.28);
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+    osc.start(t);
+    osc.stop(t + 0.3);
+  }
+
+  playOverclockFanfare() {
+    if (this.sfxVolume <= 0.01 || !this.ctx) return;
+    const t = this.ctx.currentTime;
+    const notes = [523.25, 659.25, 783.99, 1046.5];
+    notes.forEach((freq, i) => {
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, t + i * 0.07);
+      gain.gain.setValueAtTime(0.14 * this.sfxVolume, t + i * 0.07);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + i * 0.07 + 0.22);
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start(t + i * 0.07);
+      osc.stop(t + i * 0.07 + 0.24);
+    });
+  }
+
+  playTitanRageAlert() {
+    if (this.sfxVolume <= 0.01 || !this.ctx) return;
+    const t = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(130, t);
+    osc.frequency.exponentialRampToValueAtTime(55, t + 0.6);
+    gain.gain.setValueAtTime(0.22 * this.sfxVolume, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.65);
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+    osc.start(t);
+    osc.stop(t + 0.7);
   }
 }
