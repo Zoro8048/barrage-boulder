@@ -110,3 +110,43 @@ test('CombatSystem - Shatter Blast AoE and TNT explosions do not cause recursive
   });
   assert.equal(engine.rocks.length, 0);
 });
+
+test('PhysicsSystem - keeps boulders strictly within viewport top (ceiling clamp and downward deflection)', () => {
+  const { engine } = createTestEngine();
+  // Create a rock moving fast upward near the top
+  const rock = createRock({ x: 200, y: 10, vx: 0, vy: -500, size: 2, hp: 50 });
+  engine.rocks.push(rock);
+
+  // Update physics
+  engine.physicsSystem.updateRocks(0.016, engine);
+
+  // Rock must not have escaped past the top: y must be >= radius + 2, and vy must be reversed downward (> 0)
+  assert.ok(rock.y >= rock.radius, `Rock y (${rock.y}) must stay inside the viewport (>= radius ${rock.radius})`);
+  assert.ok(rock.vy > 0, `Rock vy (${rock.vy}) must deflect downwards`);
+});
+
+test('CombatSystem - does not juggle boulders out of viewport top when hit near ceiling', () => {
+  const { engine, bus } = createTestEngine();
+  const combat = new CombatSystem(bus);
+  // Place rock near top of viewport
+  const rock = createRock({ x: 200, y: 50, vx: 0, vy: -10, size: 2, hp: 500 });
+  engine.rocks.push(rock);
+
+  const bullet = {
+    x: 200,
+    y: 50,
+    vx: 0,
+    vy: -760,
+    radius: 5,
+    damageRatio: 1,
+    isGiant: false,
+    bouncesLeft: 0,
+  };
+  engine.bullets.push(bullet);
+
+  const initialVy = rock.vy;
+  combat.updateBullets(0.016, engine);
+
+  // Bullet should not have decreased vy into higher negative upward velocity
+  assert.ok(rock.vy >= initialVy, `rock.vy (${rock.vy}) should not decrease further into upward velocity when near top`);
+});

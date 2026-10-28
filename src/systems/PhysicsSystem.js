@@ -88,6 +88,17 @@ export class PhysicsSystem {
         r.vAngle = -Math.abs(r.vAngle);
       }
 
+      // Ceiling bounce - keep boulders strictly within the viewport at the top
+      const ceilingY = r.radius + 2;
+      if (r.y < ceilingY) {
+        r.y = ceilingY;
+        if (r.vy < 0) {
+          r.vy = Math.max(50, Math.abs(r.vy) * 0.45);
+          r.hitScale = 1.08;
+          engine.addParticles(r.x, r.radius, 'rgba(255, 255, 255, 0.3)', 3, 50);
+        }
+      }
+
       // Ground bounce (varied per rock + Sub-Zero Bumper add-on frost effect)
       if (r.y + r.radius >= groundY) {
         r.y = groundY - r.radius;

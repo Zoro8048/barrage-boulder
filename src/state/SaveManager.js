@@ -32,6 +32,7 @@ export function createDefaultSave(now = Date.now()) {
       sfxVolume: 80,
       musicVolume: 45,
       haptics: true,
+      cleanHud: false,
     },
     stats: {
       highestWave: 1,

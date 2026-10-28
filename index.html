@@ -33,6 +33,9 @@
           </div>
 
           <div class="hud-actions">
+            <button id="clean-hud-btn" class="icon-btn" title="Toggle Clean Viewport (H)" aria-label="Toggle Clean Viewport">
+              👁️
+            </button>
             <button id="pause-btn" class="icon-btn hidden" title="Pause Game (P / Esc)" aria-label="Pause Game">
               ⏸️
             </button>
@@ -57,24 +60,27 @@
           </div>
         </div>
 
-        <!-- Active Power-up Pills (with effect description) -->
-        <div id="powerup-hud" class="powerup-hud"></div>
+        <!-- Middle HUD Zone (Power-ups, Hull, Augments, Score) -->
+        <div id="hud-middle-zone" class="hud-middle-zone">
+          <!-- Active Power-up Pills (with effect description) -->
+          <div id="powerup-hud" class="powerup-hud"></div>
 
-        <!-- 3-Segment Hull Shield Integrity & Active Run Augments -->
-        <div id="hull-hud" class="hull-hud hidden"></div>
-        <div id="augment-hud" class="augment-hud hidden"></div>
+          <!-- 3-Segment Hull Shield Integrity & Active Run Augments -->
+          <div id="hull-hud" class="hull-hud hidden"></div>
+          <div id="augment-hud" class="augment-hud hidden"></div>
 
-        <div class="score-display">
-          <div id="current-score">0</div>
-          <div id="best-score">BEST: 0</div>
-          <div id="combo-pill" class="combo-pill hidden">🔥 5x COMBO (1.2x)</div>
-          <div id="lobby-mode-wrap" class="lobby-mode-wrap">
-            <button type="button" id="mode-toggle-btn" class="mode-chip-btn">
-              🌊 Mode: Standard
-            </button>
-            <button type="button" id="lobby-loadout-btn" class="mode-chip-btn loadout-chip-btn" title="Open Hangar Loadout">
-              🔫 Vulcan Striker • 🛸 Drones
-            </button>
+          <div class="score-display">
+            <div id="current-score">0</div>
+            <div id="best-score">BEST: 0</div>
+            <div id="combo-pill" class="combo-pill hidden">🔥 5x COMBO (1.2x)</div>
+            <div id="lobby-mode-wrap" class="lobby-mode-wrap">
+              <button type="button" id="mode-toggle-btn" class="mode-chip-btn">
+                🌊 Mode: Standard
+              </button>
+              <button type="button" id="lobby-loadout-btn" class="mode-chip-btn loadout-chip-btn" title="Open Hangar Loadout">
+                🔫 Vulcan Striker • 🛸 Drones
+              </button>
+            </div>
           </div>
         </div>
       </header>
@@ -360,6 +366,14 @@
                 <small>Mobile vibration on hits, splits &amp; bosses</small>
               </div>
               <button id="haptics-toggle-btn" class="toggle-pill active">ON</button>
+            </div>
+
+            <div class="setting-row toggle-row">
+              <div class="setting-label-col">
+                <span>👁️ Clean Viewport (Hide Top HUD)</span>
+                <small>Hide score and power-up clutter from viewport during play</small>
+              </div>
+              <button id="clean-hud-toggle-btn" class="toggle-pill">OFF</button>
             </div>
           </div>
 

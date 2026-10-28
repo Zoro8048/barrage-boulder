@@ -1003,6 +1003,7 @@
         sfxVolume: 80,
         musicVolume: 45,
         haptics: true,
+        cleanHud: false,
       },
       stats: {
         highestWave: 1,
@@ -1798,6 +1799,17 @@
           r.vAngle = -Math.abs(r.vAngle);
         }
   
+        // Ceiling bounce - keep boulders strictly within the viewport at the top
+        const ceilingY = r.radius + 2;
+        if (r.y < ceilingY) {
+          r.y = ceilingY;
+          if (r.vy < 0) {
+            r.vy = Math.max(50, Math.abs(r.vy) * 0.45);
+            r.hitScale = 1.08;
+            engine.addParticles(r.x, r.radius, 'rgba(255, 255, 255, 0.3)', 3, 50);
+          }
+        }
+  
         // Ground bounce (varied per rock + Sub-Zero Bumper add-on frost effect)
         if (r.y + r.radius >= groundY) {
           r.y = groundY - r.radius;
@@ -2380,7 +2392,11 @@
             const scaledDmg = Math.max(1, Math.round(baseBulletDmg * (b.damageRatio || 1) * mult));
   
             const hasIntactArmor = r.variant === 'armored' && !r.armorBroken;
-            if (r.vy > -110) r.vy -= b.isGiant ? 20 : 10;
+            // Apply gentle kinetic impulse when rock is safely in lower/mid zone,
+            // avoiding juggling boulders into or above the viewport ceiling
+            if (r.y > r.radius + 70 && r.vy > 30) {
+              r.vy = Math.max(10, r.vy - (b.isGiant ? 15 : 8));
+            }
   
             this.bus.emit('sfx:hit', { hpRatio: r.hp / r.maxHp, armored: hasIntactArmor });
             engine.addParticles(
@@ -2572,8 +2588,9 @@
         const childSize = rock.size - 1;
         const childHp = Math.max(1, Math.floor(rock.maxHp * 0.5));
         const spreadVx = (rock.variant === 'fast' ? 115 : 80) + Math.random() * 35;
-        const popVyLeft = -315 - Math.random() * 45;
-        const popVyRight = -225 - Math.random() * 40;
+        const isNearCeiling = rock.y < 120;
+        const popVyLeft = isNearCeiling ? (60 + Math.random() * 40) : (-260 - Math.random() * 40);
+        const popVyRight = isNearCeiling ? (80 + Math.random() * 40) : (-180 - Math.random() * 35);
         const childVariant =
           rock.variant === 'boss' || rock.variant === 'milestoneBoss' ? 'normal' : rock.variant;
   
@@ -4557,6 +4574,9 @@
       this.lobbyLoadoutBtn = document.getElementById('lobby-loadout-btn');
       this.upgradePanelEl = document.getElementById('upgrade-panel');
       this.pauseBtn = document.getElementById('pause-btn');
+      this.cleanHudBtn = document.getElementById('clean-hud-btn');
+      this.hudEl = document.getElementById('hud');
+      this.hudMiddleZoneEl = document.getElementById('hud-middle-zone');
       this.waveBannerEl = document.getElementById('wave-banner');
       this.waveBannerTextEl = document.getElementById('wave-banner-text');
       this.waveBannerBonusEl = document.getElementById('wave-banner-bonus');
@@ -4636,32 +4656,56 @@
         this.engine.selectWave(-1);
       });
   
+      this.cleanHudBtn?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.toggleCleanHud();
+      });
+  
+      window.addEventListener('keydown', (e) => {
+        if (e.key === 'h' || e.key === 'H') {
+          const isFocusInput = ['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName);
+          if (!isFocusInput) {
+            this.toggleCleanHud();
+          }
+        }
+      });
+  
+      this.bus.on('settings:cleanHudChanged', () => {
+        this.updateCleanHudUI();
+      });
+  
       this.waveNextBtn?.addEventListener('click', (e) => {
         e.stopPropagation();
         this.engine.selectWave(1);
       });
   
       this.bus.on('run:started', () => {
+        this.hudEl?.classList.add('playing-mode');
         this.startPromptEl.classList.add('hidden');
         this.lobbyModeWrapEl?.classList.add('hidden');
         this.upgradePanelEl.classList.add('hidden');
         this.pauseBtn?.classList.remove('hidden');
         this.hullHudEl?.classList.remove('hidden');
         this.augmentHudEl?.classList.remove('hidden');
+        this.updateCleanHudUI();
       });
   
       this.bus.on('run:resumed', () => {
         this.pauseBtn?.classList.remove('hidden');
+        this.updateCleanHudUI();
       });
   
       this.bus.on('run:gameover', () => {
+        this.hudEl?.classList.remove('playing-mode');
         this.pauseBtn?.classList.add('hidden');
         this.lobbyModeWrapEl?.classList.add('hidden');
         this.hullHudEl?.classList.add('hidden');
         this.augmentHudEl?.classList.add('hidden');
+        this.hudMiddleZoneEl?.classList.remove('hidden-hud');
       });
   
       this.bus.on('run:lobby', () => {
+        this.hudEl?.classList.remove('playing-mode');
         this.updateHUD();
         this.pauseBtn?.classList.add('hidden');
         this.startPromptEl.classList.remove('hidden');
@@ -4669,6 +4713,8 @@
         this.upgradePanelEl.classList.remove('hidden');
         this.hullHudEl?.classList.add('hidden');
         this.augmentHudEl?.classList.add('hidden');
+        this.hudMiddleZoneEl?.classList.remove('hidden-hud');
+        this.updateCleanHudUI();
       });
     }
   
@@ -4702,6 +4748,28 @@
       }
       if (this.startPromptTextEl) {
         this.startPromptTextEl.textContent = 'DRAG TO AIM & FIRE';
+      }
+      this.updateCleanHudUI();
+    }
+  
+    toggleCleanHud() {
+      const save = this.engine.saveManager.state;
+      if (!save.settings) save.settings = {};
+      save.settings.cleanHud = !save.settings.cleanHud;
+      this.engine.saveManager.persist();
+      this.updateCleanHudUI();
+      this.bus.emit('settings:cleanHudChanged', save.settings.cleanHud);
+    }
+  
+    updateCleanHudUI() {
+      const isClean = Boolean(this.engine.saveManager.state.settings?.cleanHud);
+      const isPlaying = this.engine.gameState === 'PLAYING';
+  
+      this.hudMiddleZoneEl?.classList.toggle('hidden-hud', isClean && isPlaying);
+      this.cleanHudBtn?.classList.toggle('active', isClean);
+      if (this.cleanHudBtn) {
+        this.cleanHudBtn.textContent = isClean ? '🙈' : '👁️';
+        this.cleanHudBtn.title = isClean ? 'Show Viewport Info (H)' : 'Clean Viewport / Hide Info (H)';
       }
     }
   
@@ -4739,7 +4807,6 @@
           return `<div class="powerup-pill" style="border-color:${meta.color}">
             <span>${meta.icon}</span>
             <span>${meta.label}</span>
-            <span class="powerup-pill-desc">(${meta.hudDesc})</span>
             <span class="powerup-pill-time">${remaining.toFixed(1)}s</span>
           </div>`;
         })
@@ -4873,6 +4940,7 @@
       this.sfxVolValEl = document.getElementById('sfx-vol-val');
       this.musicVolValEl = document.getElementById('music-vol-val');
       this.hapticsToggleBtn = document.getElementById('haptics-toggle-btn');
+      this.cleanHudToggleBtn = document.getElementById('clean-hud-toggle-btn');
   
       this.bindEvents();
     }
@@ -5072,6 +5140,14 @@
         this.syncSettingsUI();
         if (settings.haptics) this.hapticsService.vibrate(25);
         this.engine.saveManager.persist();
+      });
+  
+      this.cleanHudToggleBtn?.addEventListener('click', () => {
+        const settings = this.engine.saveManager.state.settings;
+        settings.cleanHud = !settings.cleanHud;
+        this.syncSettingsUI();
+        this.engine.saveManager.persist();
+        this.bus.emit('settings:cleanHudChanged', settings.cleanHud);
       });
   
       this.reviveBtn.addEventListener('click', () => {
@@ -5371,6 +5447,11 @@
       this.musicVolValEl.textContent = `${settings.musicVolume}%`;
       this.hapticsToggleBtn.textContent = settings.haptics ? 'ON' : 'OFF';
       this.hapticsToggleBtn.classList.toggle('active', settings.haptics);
+      if (this.cleanHudToggleBtn) {
+        const isClean = Boolean(settings.cleanHud);
+        this.cleanHudToggleBtn.textContent = isClean ? 'ON' : 'OFF';
+        this.cleanHudToggleBtn.classList.toggle('active', isClean);
+      }
       this.audioService.setVolumes(settings.sfxVolume / 100, settings.musicVolume / 100);
     }
   

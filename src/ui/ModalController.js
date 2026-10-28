@@ -70,6 +70,7 @@ export class ModalController {
     this.sfxVolValEl = document.getElementById('sfx-vol-val');
     this.musicVolValEl = document.getElementById('music-vol-val');
     this.hapticsToggleBtn = document.getElementById('haptics-toggle-btn');
+    this.cleanHudToggleBtn = document.getElementById('clean-hud-toggle-btn');
 
     this.bindEvents();
   }
@@ -269,6 +270,14 @@ export class ModalController {
       this.syncSettingsUI();
       if (settings.haptics) this.hapticsService.vibrate(25);
       this.engine.saveManager.persist();
+    });
+
+    this.cleanHudToggleBtn?.addEventListener('click', () => {
+      const settings = this.engine.saveManager.state.settings;
+      settings.cleanHud = !settings.cleanHud;
+      this.syncSettingsUI();
+      this.engine.saveManager.persist();
+      this.bus.emit('settings:cleanHudChanged', settings.cleanHud);
     });
 
     this.reviveBtn.addEventListener('click', () => {
@@ -568,6 +577,11 @@ export class ModalController {
     this.musicVolValEl.textContent = `${settings.musicVolume}%`;
     this.hapticsToggleBtn.textContent = settings.haptics ? 'ON' : 'OFF';
     this.hapticsToggleBtn.classList.toggle('active', settings.haptics);
+    if (this.cleanHudToggleBtn) {
+      const isClean = Boolean(settings.cleanHud);
+      this.cleanHudToggleBtn.textContent = isClean ? 'ON' : 'OFF';
+      this.cleanHudToggleBtn.classList.toggle('active', isClean);
+    }
     this.audioService.setVolumes(settings.sfxVolume / 100, settings.musicVolume / 100);
   }
 

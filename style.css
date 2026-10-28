@@ -241,6 +241,22 @@ html, body {
   display: none;
 }
 
+/* Middle HUD Zone (Power-ups, Hull, Augments, Score) - Can be cleanly hidden */
+.hud-middle-zone {
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.hud-middle-zone.hidden-hud {
+  display: none !important;
+}
+
+#clean-hud-btn.active {
+  background: rgba(56, 182, 255, 0.35);
+  border-color: var(--accent-blue);
+  color: #fff;
+  box-shadow: 0 0 10px rgba(56, 182, 255, 0.4);
+}
+
 .boss-hud-label {
   font-size: 10px;
   font-weight: 900;
@@ -279,20 +295,19 @@ html, body {
 .powerup-pill {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   background: rgba(10, 15, 34, 0.88);
   border: 1.5px solid var(--accent-blue);
   border-radius: 999px;
-  padding: 4px 10px;
-  font-size: 10.5px;
+  padding: 3px 8px;
+  font-size: 10px;
   font-weight: 800;
   color: #fff;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
 }
 
 .powerup-pill-desc {
-  color: #d2e2ff;
-  font-weight: 700;
+  display: none;
 }
 
 .powerup-pill-time {
@@ -395,6 +410,17 @@ html, body {
   margin-top: 8px;
   text-align: center;
   text-shadow: 0 4px 12px rgba(0, 0, 0, 0.55);
+}
+
+.playing-mode #best-score {
+  display: none;
+}
+
+.playing-mode #current-score {
+  font-size: 24px;
+  color: rgba(255, 255, 255, 0.65);
+  margin-top: 2px;
+  transition: font-size 0.2s ease, color 0.2s ease;
 }
 
 #current-score {

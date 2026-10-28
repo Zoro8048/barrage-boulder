@@ -400,7 +400,11 @@ export class CombatSystem {
           const scaledDmg = Math.max(1, Math.round(baseBulletDmg * (b.damageRatio || 1) * mult));
 
           const hasIntactArmor = r.variant === 'armored' && !r.armorBroken;
-          if (r.vy > -110) r.vy -= b.isGiant ? 20 : 10;
+          // Apply gentle kinetic impulse when rock is safely in lower/mid zone,
+          // avoiding juggling boulders into or above the viewport ceiling
+          if (r.y > r.radius + 70 && r.vy > 30) {
+            r.vy = Math.max(10, r.vy - (b.isGiant ? 15 : 8));
+          }
 
           this.bus.emit('sfx:hit', { hpRatio: r.hp / r.maxHp, armored: hasIntactArmor });
           engine.addParticles(
@@ -592,8 +596,9 @@ export class CombatSystem {
       const childSize = rock.size - 1;
       const childHp = Math.max(1, Math.floor(rock.maxHp * 0.5));
       const spreadVx = (rock.variant === 'fast' ? 115 : 80) + Math.random() * 35;
-      const popVyLeft = -315 - Math.random() * 45;
-      const popVyRight = -225 - Math.random() * 40;
+      const isNearCeiling = rock.y < 120;
+      const popVyLeft = isNearCeiling ? (60 + Math.random() * 40) : (-260 - Math.random() * 40);
+      const popVyRight = isNearCeiling ? (80 + Math.random() * 40) : (-180 - Math.random() * 35);
       const childVariant =
         rock.variant === 'boss' || rock.variant === 'milestoneBoss' ? 'normal' : rock.variant;
 

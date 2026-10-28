@@ -42,6 +42,9 @@ export class HudController {
     this.lobbyLoadoutBtn = document.getElementById('lobby-loadout-btn');
     this.upgradePanelEl = document.getElementById('upgrade-panel');
     this.pauseBtn = document.getElementById('pause-btn');
+    this.cleanHudBtn = document.getElementById('clean-hud-btn');
+    this.hudEl = document.getElementById('hud');
+    this.hudMiddleZoneEl = document.getElementById('hud-middle-zone');
     this.waveBannerEl = document.getElementById('wave-banner');
     this.waveBannerTextEl = document.getElementById('wave-banner-text');
     this.waveBannerBonusEl = document.getElementById('wave-banner-bonus');
@@ -121,32 +124,56 @@ export class HudController {
       this.engine.selectWave(-1);
     });
 
+    this.cleanHudBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.toggleCleanHud();
+    });
+
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'h' || e.key === 'H') {
+        const isFocusInput = ['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName);
+        if (!isFocusInput) {
+          this.toggleCleanHud();
+        }
+      }
+    });
+
+    this.bus.on('settings:cleanHudChanged', () => {
+      this.updateCleanHudUI();
+    });
+
     this.waveNextBtn?.addEventListener('click', (e) => {
       e.stopPropagation();
       this.engine.selectWave(1);
     });
 
     this.bus.on('run:started', () => {
+      this.hudEl?.classList.add('playing-mode');
       this.startPromptEl.classList.add('hidden');
       this.lobbyModeWrapEl?.classList.add('hidden');
       this.upgradePanelEl.classList.add('hidden');
       this.pauseBtn?.classList.remove('hidden');
       this.hullHudEl?.classList.remove('hidden');
       this.augmentHudEl?.classList.remove('hidden');
+      this.updateCleanHudUI();
     });
 
     this.bus.on('run:resumed', () => {
       this.pauseBtn?.classList.remove('hidden');
+      this.updateCleanHudUI();
     });
 
     this.bus.on('run:gameover', () => {
+      this.hudEl?.classList.remove('playing-mode');
       this.pauseBtn?.classList.add('hidden');
       this.lobbyModeWrapEl?.classList.add('hidden');
       this.hullHudEl?.classList.add('hidden');
       this.augmentHudEl?.classList.add('hidden');
+      this.hudMiddleZoneEl?.classList.remove('hidden-hud');
     });
 
     this.bus.on('run:lobby', () => {
+      this.hudEl?.classList.remove('playing-mode');
       this.updateHUD();
       this.pauseBtn?.classList.add('hidden');
       this.startPromptEl.classList.remove('hidden');
@@ -154,6 +181,8 @@ export class HudController {
       this.upgradePanelEl.classList.remove('hidden');
       this.hullHudEl?.classList.add('hidden');
       this.augmentHudEl?.classList.add('hidden');
+      this.hudMiddleZoneEl?.classList.remove('hidden-hud');
+      this.updateCleanHudUI();
     });
   }
 
@@ -187,6 +216,28 @@ export class HudController {
     }
     if (this.startPromptTextEl) {
       this.startPromptTextEl.textContent = 'DRAG TO AIM & FIRE';
+    }
+    this.updateCleanHudUI();
+  }
+
+  toggleCleanHud() {
+    const save = this.engine.saveManager.state;
+    if (!save.settings) save.settings = {};
+    save.settings.cleanHud = !save.settings.cleanHud;
+    this.engine.saveManager.persist();
+    this.updateCleanHudUI();
+    this.bus.emit('settings:cleanHudChanged', save.settings.cleanHud);
+  }
+
+  updateCleanHudUI() {
+    const isClean = Boolean(this.engine.saveManager.state.settings?.cleanHud);
+    const isPlaying = this.engine.gameState === 'PLAYING';
+
+    this.hudMiddleZoneEl?.classList.toggle('hidden-hud', isClean && isPlaying);
+    this.cleanHudBtn?.classList.toggle('active', isClean);
+    if (this.cleanHudBtn) {
+      this.cleanHudBtn.textContent = isClean ? '🙈' : '👁️';
+      this.cleanHudBtn.title = isClean ? 'Show Viewport Info (H)' : 'Clean Viewport / Hide Info (H)';
     }
   }
 
@@ -224,7 +275,6 @@ export class HudController {
         return `<div class="powerup-pill" style="border-color:${meta.color}">
           <span>${meta.icon}</span>
           <span>${meta.label}</span>
-          <span class="powerup-pill-desc">(${meta.hudDesc})</span>
           <span class="powerup-pill-time">${remaining.toFixed(1)}s</span>
         </div>`;
       })

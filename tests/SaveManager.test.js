@@ -38,6 +38,7 @@ test('SaveManager - migrates legacy v1 save data cleanly without losing progress
   assert.equal(migrated.equipped.skin, 'classic');
   assert.equal(migrated.equipped.cannon, 'striker');
   assert.equal(migrated.equipped.addon, 'wingmanDrones');
+  assert.equal(migrated.settings.cleanHud, false);
 });
 
 test('Catalogs - 8 Power-Ups, 5 Cannon Varieties, 5 Tactical Add-Ons, and 8 Augments are registered', () => {
